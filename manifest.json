@@ -1,0 +1,25 @@
+{
+  "name": "LISEC - Compte rendu d'intervention",
+  "short_name": "LISEC CR",
+  "description": "Application mobile LISEC pour les comptes rendus d'intervention.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f7fb",
+  "theme_color": "#77749b",
+  "icons": [
+    {
+      "src": "assets/logo-lisec.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/logo-lisec.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

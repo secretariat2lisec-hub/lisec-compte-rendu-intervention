@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#77749b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>LISEC - Compte rendu d'intervention</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --bg: #f7f7fb;
+      --panel: #ffffff;
+      --ink: #262638;
+      --muted: #68677a;
+      --line: #dcdae8;
+      --brand: #77749b;
+      --brand-strong: #55527c;
+      --green: #9bd542;
+      --yellow: #f3df39;
+      --pink: #ff5c9e;
+      --danger: #b42318;
+      --shadow: 0 12px 32px rgba(39, 37, 63, 0.12);
+      --radius: 8px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 18px;
+      line-height: 1.45;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    input,
+    select,
+    textarea,
+    label {
+      touch-action: manipulation;
+    }
+
+    .app {
+      width: min(760px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    header {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      flex-direction: column;
+      padding: 18px 0 12px;
+    }
+
+    .logo {
+      width: min(260px, 46vw);
+      height: auto;
+      display: block;
+    }
+
+    .header-text {
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.35rem, 3vw, 2rem);
+      line-height: 1.1;
+      color: var(--brand-strong);
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    form {
+      display: grid;
+      gap: 18px;
+    }
+
+    section,
+    .review-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    section h2,
+    .review-panel h2 {
+      margin: 0 0 14px;
+      font-size: 1.25rem;
+      color: var(--brand-strong);
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--ink);
+      padding: 13px 14px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 128px;
+      resize: vertical;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px rgba(119, 116, 155, 0.16);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .actions,
+    .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      min-height: 54px;
+      border: 0;
+      border-radius: var(--radius);
+      padding: 13px 18px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .top-actions button {
+      flex: 1 1 240px;
+    }
+
+    button.secondary {
+      background: #eeedf6;
+      color: var(--brand-strong);
+    }
+
+    button.danger {
+      background: #fff0ef;
+      color: var(--danger);
+      border: 1px solid #ffd1cc;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: progress;
+    }
+
+    .level {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fbfbfe;
+      display: grid;
+      gap: 12px;
+    }
+
+    .level-head,
+    .entry-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .level-title {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--brand-strong);
+    }
+
+    .entry {
+      border-left: 5px solid var(--brand);
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .entry:nth-child(3n + 1) {
+      border-left-color: var(--green);
+    }
+
+    .entry:nth-child(3n + 2) {
+      border-left-color: var(--yellow);
+    }
+
+    .entry:nth-child(3n + 3) {
+      border-left-color: var(--pink);
+    }
+
+    .entry-title {
+      font-weight: 700;
+      color: var(--brand-strong);
+    }
+
+    .photos {
+      display: grid;
+      gap: 10px;
+    }
+
+    .photo-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+      gap: 10px;
+    }
+
+    .photo-chip {
+      min-height: 112px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #f4f3fa;
+      display: grid;
+      grid-template-rows: 1fr auto;
+    }
+
+    .photo-chip img {
+      width: 100%;
+      height: 92px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-chip span {
+      padding: 6px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .status {
+      min-height: 28px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .status.ok {
+      color: #26734d;
+    }
+
+    .review {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 19, 34, 0.46);
+      z-index: 10;
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .review.open {
+      display: block;
+    }
+
+    .review-panel {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .review-content {
+      display: grid;
+      gap: 14px;
+      max-height: 62vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .review-block {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+    }
+
+    .review-block:last-child {
+      border-bottom: 0;
+    }
+
+    .review-block h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+      color: var(--brand-strong);
+    }
+
+    .review-block p {
+      margin: 5px 0;
+      white-space: pre-wrap;
+    }
+
+    .top-actions {
+      position: sticky;
+      bottom: 0;
+      background: linear-gradient(to top, var(--bg) 78%, rgba(247, 247, 251, 0));
+      padding-top: 18px;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    @media (max-width: 720px) {
+      .app {
+        padding: 12px;
+      }
+
+      section,
+      .review-panel {
+        padding: 14px;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .level-head,
+      .entry-head {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .inline-actions button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <img class="logo" src="assets/logo-lisec.png" alt="LISEC">
+      <div class="header-text">
+        <h1>Compte rendu d'intervention</h1>
+        <p class="subtitle">Saisie mobile, photos, rapport Word et envoi au secretariat.</p>
+      </div>
+    </header>
+
+    <form id="reportForm">
+      <section>
+        <h2>Intervention</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="visitDate">Date de visite</label>
+            <input id="visitDate" name="visitDate" type="date">
+          </div>
+          <div class="field">
+            <label for="engineer">Nom de l'ingenieur</label>
+            <input id="engineer" name="engineer" type="text" autocomplete="name">
+          </div>
+          <div class="field full">
+            <label for="siteAddress">Adresse / site visite</label>
+            <input id="siteAddress" name="siteAddress" type="text" autocomplete="street-address">
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Description generale</h2>
+        <div class="grid">
+          <div class="field full">
+            <label for="workDescription">Description de l'ouvrage</label>
+            <textarea id="workDescription" name="workDescription"></textarea>
+          </div>
+          <div class="field full">
+            <label for="construction">Construction</label>
+            <textarea id="construction" name="construction" placeholder="- Element 1&#10;- Element 2&#10;- Element 3"></textarea>
+            <div class="hint">Saisir 5 ou 6 tirets si besoin.</div>
+          </div>
+          <div class="field full">
+            <label for="visitNote">Note particuliere sur la visite</label>
+            <textarea id="visitNote" name="visitNote"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="level-head">
+          <h2>Desordres constates</h2>
+          <div class="inline-actions">
+            <input id="newLevelName" type="text" placeholder="Ex : R+4, Sous-sol, Combles" aria-label="Nom du niveau a ajouter">
+            <button class="secondary" type="button" id="addLevelBtn">Ajouter un niveau</button>
+          </div>
+        </div>
+        <div id="levels" class="levels"></div>
+      </section>
+
+      <section>
+        <h2>Synthese</h2>
+        <div class="grid">
+          <div class="field full">
+            <label for="conclusion">Conclusion</label>
+            <textarea id="conclusion" name="conclusion"></textarea>
+          </div>
+          <div class="field full">
+            <label for="recommendation">Preconisation</label>
+            <textarea id="recommendation" name="recommendation"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Destinataire du rapport</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="recipientCivility">Civilite</label>
+            <select id="recipientCivility" name="recipientCivility"></select>
+          </div>
+          <div class="field">
+            <label for="recipientName">Nom</label>
+            <input id="recipientName" name="recipientName" type="text" autocomplete="name">
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Envoi</h2>
+        <p class="hint">Le compte rendu sera envoye automatiquement au secretariat LISEC.</p>
+        <div class="status" id="status"></div>
+      </section>
+
+      <div class="top-actions actions">
+        <button type="button" id="reviewBtn">Voir le recapitulatif</button>
+        <button class="secondary" type="button" id="saveBtn">Sauvegarder sur cet appareil</button>
+      </div>
+    </form>
+  </main>
+
+  <div class="review" id="review">
+    <div class="review-panel">
+      <h2>Recapitulatif avant envoi</h2>
+      <div class="review-content" id="reviewContent"></div>
+      <div class="actions" style="margin-top: 16px;">
+        <button type="button" id="sendBtn">Envoyer</button>
+        <button class="secondary" type="button" id="closeReviewBtn">Modifier</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    const MAX_PHOTO_WIDTH = 1600;
+    const JPEG_QUALITY = 0.82;
+    const STORAGE_KEY = "lisec_intervention_draft_v1";
+    const GOOGLE_APPS_SCRIPT_URL = "";
+
+    const state = {
+      levels: [],
+      photoId: 1
+    };
+
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+    function init() {
+      fillSelect($("#recipientCivility"), window.LISEC_DATA.civilites);
+      window.LISEC_DATA.niveaux.forEach((name) => addLevel(name));
+      $("#visitDate").valueAsDate = new Date();
+
+      restoreDraft();
+      bindEvents();
+      registerServiceWorker();
+    }
+
+    function bindEvents() {
+      $("#addLevelBtn").addEventListener("click", () => {
+        const input = $("#newLevelName");
+        const name = input.value.trim();
+        if (!name) {
+          setStatus("Indique le nom du niveau a ajouter, par exemple R+4.", true);
+          input.focus();
+          return;
+        }
+        addLevel(name, true);
+        input.value = "";
+        setStatus(`Niveau ${name} ajoute.`, false, true);
+      });
+
+      $("#reviewBtn").addEventListener("click", openReview);
+      $("#closeReviewBtn").addEventListener("click", () => $("#review").classList.remove("open"));
+      $("#sendBtn").addEventListener("click", sendReport);
+      $("#saveBtn").addEventListener("click", saveDraft);
+    }
+
+    function fillSelect(select, values) {
+      select.innerHTML = values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value || "Selectionner")}</option>`).join("");
+    }
+
+    function addLevel(name, withFirstEntry = false) {
+      const level = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        name,
+        entries: []
+      };
+      state.levels.push(level);
+      renderLevels();
+      if (withFirstEntry) addEntry(level.id);
+    }
+
+    function addEntry(levelId) {
+      const level = state.levels.find((item) => item.id === levelId);
+      if (!level) return;
+      level.entries.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        localisation: "",
+        comment: "",
+        gravity: "",
+        photos: []
+      });
+      renderLevels();
+    }
+
+    function removeEntry(levelId, entryId) {
+      const level = state.levels.find((item) => item.id === levelId);
+      if (!level) return;
+      level.entries = level.entries.filter((entry) => entry.id !== entryId);
+      renderLevels();
+    }
+
+    function removeLevel(levelId) {
+      state.levels = state.levels.filter((level) => level.id !== levelId);
+      renderLevels();
+    }
+
+    function renderLevels() {
+      const levelsRoot = $("#levels");
+      levelsRoot.innerHTML = "";
+
+      state.levels.forEach((level) => {
+        const levelEl = document.createElement("div");
+        levelEl.className = "level";
+        levelEl.dataset.levelId = level.id;
+        levelEl.innerHTML = `
+          <div class="level-head">
+            <h3 class="level-title">Desordre sur ${escapeHtml(level.name)}</h3>
+            <div class="inline-actions">
+              <button class="secondary" type="button" data-action="add-entry">Ajouter une localisation</button>
+              <button class="danger" type="button" data-action="remove-level">Supprimer le niveau</button>
+            </div>
+          </div>
+          <div class="entries"></div>
+        `;
+
+        const entriesRoot = $(".entries", levelEl);
+        level.entries.forEach((entry, index) => entriesRoot.appendChild(renderEntry(level.id, entry, index)));
+        levelsRoot.appendChild(levelEl);
+
+        $('[data-action="add-entry"]', levelEl).addEventListener("click", () => addEntry(level.id));
+        $('[data-action="remove-level"]', levelEl).addEventListener("click", () => removeLevel(level.id));
+      });
+    }
+
+    function renderEntry(levelId, entry, index) {
+      const entryEl = document.createElement("div");
+      entryEl.className = "entry";
+      entryEl.dataset.entryId = entry.id;
+      entryEl.innerHTML = `
+        <div class="entry-head">
+          <div class="entry-title">Localisation ${index + 1}</div>
+          <button class="danger" type="button" data-action="remove-entry">Supprimer</button>
+        </div>
+        <div class="grid">
+          <div class="field full">
+            <label>Localisation</label>
+            <input type="text" data-field="localisation" value="${escapeHtml(entry.localisation)}" placeholder="Ex : facade avant, angle gauche, cage d'escalier">
+          </div>
+          <div class="field full">
+            <label>Commentaire</label>
+            <textarea data-field="comment">${escapeHtml(entry.comment)}</textarea>
+          </div>
+          <div class="field">
+            <label>Gravite</label>
+            <select data-field="gravity">${window.LISEC_DATA.gravites.map((value) => `<option value="${escapeHtml(value)}" ${entry.gravity === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>
+          </div>
+          <div class="field photos">
+            <label>Photos</label>
+            <input type="file" accept="image/*" capture="environment" data-field="cameraPhotos">
+            <input type="file" accept="image/*" multiple data-field="galleryPhotos">
+            <div class="hint">Premier bouton : appareil photo. Second bouton : galerie avec plusieurs images. Les images sont compressees avant l'envoi.</div>
+          </div>
+        </div>
+        <div class="photo-list"></div>
+      `;
+
+      $('[data-action="remove-entry"]', entryEl).addEventListener("click", () => removeEntry(levelId, entry.id));
+      $('[data-field="localisation"]', entryEl).addEventListener("input", (event) => entry.localisation = event.target.value);
+      $('[data-field="comment"]', entryEl).addEventListener("input", (event) => entry.comment = event.target.value);
+      $('[data-field="gravity"]', entryEl).addEventListener("change", (event) => entry.gravity = event.target.value);
+      $('[data-field="cameraPhotos"]', entryEl).addEventListener("change", (event) => addPhotos(entry, event.target.files));
+      $('[data-field="galleryPhotos"]', entryEl).addEventListener("change", (event) => addPhotos(entry, event.target.files));
+
+      renderPhotoList(entry, $(".photo-list", entryEl));
+      return entryEl;
+    }
+
+    async function addPhotos(entry, files) {
+      setStatus("Preparation des photos...");
+      for (const file of Array.from(files || [])) {
+        try {
+          const compressed = await compressImage(file);
+          entry.photos.push({
+            id: state.photoId++,
+            name: file.name || `photo-${state.photoId}.jpg`,
+            type: "image/jpeg",
+            size: compressed.size,
+            dataUrl: compressed.dataUrl
+          });
+        } catch (error) {
+          setStatus(`Photo ignoree : ${file.name}`, true);
+        }
+      }
+      renderLevels();
+      setStatus("Photos ajoutees.", false, true);
+    }
+
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const scale = Math.min(1, MAX_PHOTO_WIDTH / img.width);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+            resolve({ dataUrl, size: Math.round((dataUrl.length * 3) / 4) });
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderPhotoList(entry, root) {
+      root.innerHTML = "";
+      entry.photos.forEach((photo) => {
+        const chip = document.createElement("div");
+        chip.className = "photo-chip";
+        chip.innerHTML = `<img src="${photo.dataUrl}" alt=""><span>${escapeHtml(photo.name)}</span>`;
+        chip.addEventListener("click", () => {
+          entry.photos = entry.photos.filter((item) => item.id !== photo.id);
+          renderLevels();
+        });
+        root.appendChild(chip);
+      });
+    }
+
+    function collectPayload() {
+      const payload = {
+        submittedAt: new Date().toISOString(),
+        company: "LISEC",
+        visitDate: $("#visitDate").value,
+        engineer: $("#engineer").value.trim(),
+        recipientCivility: $("#recipientCivility").value,
+        recipientName: $("#recipientName").value.trim(),
+        siteAddress: $("#siteAddress").value.trim(),
+        workDescription: $("#workDescription").value.trim(),
+        construction: $("#construction").value.trim(),
+        visitNote: $("#visitNote").value.trim(),
+        conclusion: $("#conclusion").value.trim(),
+        recommendation: $("#recommendation").value.trim(),
+        levels: state.levels.map((level) => ({
+          name: level.name,
+          entries: level.entries.map((entry) => ({
+            localisation: entry.localisation,
+            comment: entry.comment,
+            gravity: entry.gravity,
+            photos: entry.photos
+          }))
+        }))
+      };
+      return payload;
+    }
+
+    function openReview() {
+      const payload = collectPayload();
+      const photoCount = payload.levels.reduce((total, level) => total + level.entries.reduce((sum, entry) => sum + entry.photos.length, 0), 0);
+      const filledEntries = payload.levels.reduce((total, level) => total + level.entries.length, 0);
+
+      $("#reviewContent").innerHTML = `
+        <div class="review-block">
+          <h3>Intervention</h3>
+          <p><strong>Date :</strong> ${escapeHtml(payload.visitDate)}</p>
+          <p><strong>Ingenieur :</strong> ${escapeHtml(payload.engineer)}</p>
+          <p><strong>Destinataire :</strong> ${escapeHtml([payload.recipientCivility, payload.recipientName].filter(Boolean).join(" "))}</p>
+          <p><strong>Adresse :</strong> ${escapeHtml(payload.siteAddress)}</p>
+        </div>
+        <div class="review-block">
+          <h3>Description</h3>
+          <p>${escapeHtml(payload.workDescription || "Non renseigne")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Construction</h3>
+          <p>${escapeHtml(payload.construction || "Non renseigne")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Note particuliere</h3>
+          <p>${escapeHtml(payload.visitNote || "Non renseigne")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Desordres</h3>
+          <p>${filledEntries} localisation(s), ${photoCount} photo(s).</p>
+          ${payload.levels.map(renderLevelReview).join("")}
+        </div>
+        <div class="review-block">
+          <h3>Conclusion</h3>
+          <p>${escapeHtml(payload.conclusion || "Non renseigne")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Preconisation</h3>
+          <p>${escapeHtml(payload.recommendation || "Non renseigne")}</p>
+        </div>
+      `;
+      $("#review").classList.add("open");
+    }
+
+    function renderLevelReview(level) {
+      if (!level.entries.length) return `<p><strong>${escapeHtml(level.name)} :</strong> aucune localisation.</p>`;
+      return `
+        <p><strong>${escapeHtml(level.name)}</strong></p>
+        ${level.entries.map((entry, index) => `
+          <p>
+            ${index + 1}. ${escapeHtml(entry.localisation || "Localisation non renseignee")}
+            - ${escapeHtml(entry.gravity || "Gravite non renseignee")}
+            - ${entry.photos.length} photo(s)<br>
+            ${escapeHtml(entry.comment || "")}
+          </p>
+        `).join("")}
+      `;
+    }
+
+    async function sendReport() {
+      const scriptUrl = GOOGLE_APPS_SCRIPT_URL.trim();
+      if (!scriptUrl) {
+        setStatus("Application pas encore connectee a Google. Il faut ajouter l'adresse Apps Script dans le code avant le vrai envoi.", true);
+        return;
+      }
+
+      const payload = collectPayload();
+      $("#sendBtn").disabled = true;
+      setStatus("Envoi en cours...");
+
+      try {
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (!result.ok) throw new Error(result.error || "Erreur inconnue");
+
+        setStatus("Compte rendu envoye. Rapport et photos enregistres.", false, true);
+        $("#review").classList.remove("open");
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (error) {
+        setStatus(`Envoi impossible : ${error.message}`, true);
+      } finally {
+        $("#sendBtn").disabled = false;
+      }
+    }
+
+    function saveDraft() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(collectPayload()));
+      setStatus("Brouillon sauvegarde sur cet appareil.", false, true);
+    }
+
+    function restoreDraft() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      try {
+        const draft = JSON.parse(raw);
+        $("#visitDate").value = draft.visitDate || $("#visitDate").value;
+        $("#engineer").value = draft.engineer || "";
+        $("#recipientCivility").value = draft.recipientCivility || "";
+        $("#recipientName").value = draft.recipientName || "";
+        $("#siteAddress").value = draft.siteAddress || "";
+        $("#workDescription").value = draft.workDescription || "";
+        $("#construction").value = draft.construction || "";
+        $("#visitNote").value = draft.visitNote || "";
+        $("#conclusion").value = draft.conclusion || "";
+        $("#recommendation").value = draft.recommendation || "";
+        if (Array.isArray(draft.levels) && draft.levels.length) {
+          state.levels = draft.levels.map((level) => ({
+            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+            name: level.name,
+            entries: (level.entries || []).map((entry) => ({
+              id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+              localisation: entry.localisation || "",
+              comment: entry.comment || "",
+              gravity: entry.gravity || "",
+              photos: entry.photos || []
+            }))
+          }));
+          renderLevels();
+        }
+      } catch (error) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+
+    function setStatus(message, isError = false, isOk = false) {
+      const status = $("#status");
+      status.textContent = message;
+      status.className = `status${isError ? " error" : ""}${isOk ? " ok" : ""}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function registerServiceWorker() {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

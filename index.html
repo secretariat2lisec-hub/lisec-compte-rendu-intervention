@@ -461,6 +461,12 @@
         width: 100%;
       }
     }
+
+    @media (max-width: 520px) {
+      .visit-row {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -583,9 +589,9 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-07-3"></script>
+  <script src="data.js?v=2026-07-07-4"></script>
   <script>
-    const APP_VERSION = "2026-07-07-3";
+    const APP_VERSION = "2026-07-07-4";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.82;
     const STORAGE_KEY = "lisec_intervention_draft_v1";

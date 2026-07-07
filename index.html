@@ -118,6 +118,12 @@
       grid-template-columns: 1fr;
     }
 
+    .visit-row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+
     .field {
       display: grid;
       gap: 7px;
@@ -185,9 +191,21 @@
       flex: 1 1 240px;
     }
 
+    .form-actions {
+      display: grid;
+      gap: 10px;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
     button.secondary {
       background: #eeedf6;
       color: var(--brand-strong);
+    }
+
+    button.level-add {
+      background: var(--brand-strong);
+      color: #fff;
+      border: 1px solid var(--brand-strong);
     }
 
     button.danger {
@@ -208,6 +226,16 @@
       background: #fbfbfe;
       display: grid;
       gap: 12px;
+    }
+
+    .disorders {
+      background: #e2e5f3;
+      border-color: #c7cce3;
+    }
+
+    .levels {
+      display: grid;
+      gap: 18px;
     }
 
     .level-head,
@@ -233,6 +261,12 @@
       gap: 12px;
     }
 
+    .entry + .entry {
+      margin-top: 8px;
+      padding-top: 22px;
+      border-top: 2px solid #d8dcee;
+    }
+
     .entry:nth-child(3n + 1) {
       border-left-color: var(--green);
     }
@@ -250,9 +284,48 @@
       color: var(--brand-strong);
     }
 
+    .entry-actions {
+      display: grid;
+      gap: 10px;
+    }
+
     .photos {
       display: grid;
       gap: 10px;
+    }
+
+    .photo-buttons {
+      display: grid;
+      gap: 10px;
+    }
+
+    .file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      clip-path: inset(50%);
+      border: 0;
+      padding: 0;
+    }
+
+    .file-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      border-radius: var(--radius);
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      padding: 13px 18px;
+    }
+
+    .file-button.secondary {
+      background: #eeedf6;
+      color: var(--brand-strong);
     }
 
     .photo-list {
@@ -346,14 +419,6 @@
       white-space: pre-wrap;
     }
 
-    .top-actions {
-      position: sticky;
-      bottom: 0;
-      background: linear-gradient(to top, var(--bg) 78%, rgba(247, 247, 251, 0));
-      padding-top: 18px;
-      padding-bottom: env(safe-area-inset-bottom);
-    }
-
     @media (max-width: 720px) {
       .app {
         padding: 12px;
@@ -368,8 +433,15 @@
         width: 100%;
       }
 
-      .level-head,
-      .entry-head {
+      .file-button {
+        width: 100%;
+      }
+
+      .visit-row {
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      }
+
+      .level-head {
         align-items: stretch;
         flex-direction: column;
       }
@@ -386,7 +458,7 @@
       <img class="logo" src="assets/logo-lisec.png" alt="LISEC">
       <div class="header-text">
         <h1>Compte rendu d'intervention</h1>
-        <p class="subtitle">Saisie mobile, photos, rapport Word et envoi au secretariat.</p>
+        <p class="subtitle">Saisie mobile, photos, rapport Word et envoi au secrétariat.</p>
       </div>
     </header>
 
@@ -395,22 +467,36 @@
         <h2>Intervention</h2>
         <div class="grid">
           <div class="field">
-            <label for="visitDate">Date de visite</label>
-            <input id="visitDate" name="visitDate" type="date">
+            <label for="reportTitle">Titre</label>
+            <input id="reportTitle" name="reportTitle" type="text">
+          </div>
+          <div class="visit-row">
+            <div class="field">
+              <label for="visitDate">Date de visite</label>
+              <input id="visitDate" name="visitDate" type="date">
+            </div>
+            <div class="field">
+              <label for="visitTime">Heure</label>
+              <input id="visitTime" name="visitTime" type="time">
+            </div>
           </div>
           <div class="field">
-            <label for="engineer">Nom de l'ingenieur</label>
+            <label for="engineer">Nom de l'ingénieur</label>
             <input id="engineer" name="engineer" type="text" autocomplete="name">
           </div>
           <div class="field full">
             <label for="siteAddress">Adresse / site visite</label>
             <input id="siteAddress" name="siteAddress" type="text" autocomplete="street-address">
           </div>
+          <div class="field full">
+            <label for="presentPeople">Personnes présentes</label>
+            <textarea id="presentPeople" name="presentPeople" placeholder="- Nom 1&#10;- Nom 2&#10;- Sté Lisec">- Sté Lisec</textarea>
+          </div>
         </div>
       </section>
 
       <section>
-        <h2>Description generale</h2>
+        <h2>Description générale</h2>
         <div class="grid">
           <div class="field full">
             <label for="workDescription">Description de l'ouvrage</label>
@@ -422,32 +508,31 @@
             <div class="hint">Saisir 5 ou 6 tirets si besoin.</div>
           </div>
           <div class="field full">
-            <label for="visitNote">Note particuliere sur la visite</label>
+            <label for="visitNote">Note particulière sur la visite</label>
             <textarea id="visitNote" name="visitNote"></textarea>
           </div>
         </div>
       </section>
 
-      <section>
-        <div class="level-head">
-          <h2>Desordres constates</h2>
-          <div class="inline-actions">
-            <input id="newLevelName" type="text" placeholder="Ex : R+4, Sous-sol, Combles" aria-label="Nom du niveau a ajouter">
-            <button class="secondary" type="button" id="addLevelBtn">Ajouter un niveau</button>
-          </div>
-        </div>
+      <section class="disorders">
+        <h2>Désordres constatés</h2>
         <div id="levels" class="levels"></div>
+        <div class="field" style="margin-top: 18px;">
+          <label for="newLevelName">Ajouter un niveau complémentaire</label>
+          <input id="newLevelName" type="text" placeholder="Ex : R+4, Sous-sol, Combles" aria-label="Nom du niveau à ajouter">
+          <button class="level-add" type="button" id="addLevelBtn">Ajouter ce niveau</button>
+        </div>
       </section>
 
       <section>
-        <h2>Synthese</h2>
+        <h2>Synthèse</h2>
         <div class="grid">
           <div class="field full">
             <label for="conclusion">Conclusion</label>
             <textarea id="conclusion" name="conclusion"></textarea>
           </div>
           <div class="field full">
-            <label for="recommendation">Preconisation</label>
+            <label for="recommendation">Préconisation</label>
             <textarea id="recommendation" name="recommendation"></textarea>
           </div>
         </div>
@@ -457,7 +542,7 @@
         <h2>Destinataire du rapport</h2>
         <div class="grid">
           <div class="field">
-            <label for="recipientCivility">Civilite</label>
+            <label for="recipientCivility">Civilité</label>
             <select id="recipientCivility" name="recipientCivility"></select>
           </div>
           <div class="field">
@@ -467,14 +552,10 @@
         </div>
       </section>
 
-      <section>
-        <h2>Envoi</h2>
-        <p class="hint">Le compte rendu sera envoye automatiquement au secretariat LISEC.</p>
-        <div class="status" id="status"></div>
-      </section>
+      <div class="status" id="status"></div>
 
-      <div class="top-actions actions">
-        <button type="button" id="reviewBtn">Voir le recapitulatif</button>
+      <div class="form-actions">
+        <button type="button" id="reviewBtn">Voir le récapitulatif</button>
         <button class="secondary" type="button" id="saveBtn">Sauvegarder sur cet appareil</button>
       </div>
     </form>
@@ -482,7 +563,7 @@
 
   <div class="review" id="review">
     <div class="review-panel">
-      <h2>Recapitulatif avant envoi</h2>
+      <h2>Récapitulatif avant envoi</h2>
       <div class="review-content" id="reviewContent"></div>
       <div class="actions" style="margin-top: 16px;">
         <button type="button" id="sendBtn">Envoyer</button>
@@ -508,8 +589,9 @@
 
     function init() {
       fillSelect($("#recipientCivility"), window.LISEC_DATA.civilites);
-      window.LISEC_DATA.niveaux.forEach((name) => addLevel(name));
+      window.LISEC_DATA.niveaux.forEach((name) => addLevel(name, false, true));
       $("#visitDate").valueAsDate = new Date();
+      $("#visitTime").value = currentTimeValue();
 
       restoreDraft();
       bindEvents();
@@ -525,9 +607,9 @@
           input.focus();
           return;
         }
-        addLevel(name, true);
+        addLevel(name, true, false);
         input.value = "";
-        setStatus(`Niveau ${name} ajoute.`, false, true);
+          setStatus(`Niveau ${name} ajouté.`, false, true);
       });
 
       $("#reviewBtn").addEventListener("click", openReview);
@@ -540,10 +622,11 @@
       select.innerHTML = values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value || "Selectionner")}</option>`).join("");
     }
 
-    function addLevel(name, withFirstEntry = false) {
+    function addLevel(name, withFirstEntry = false, isDefault = false) {
       const level = {
         id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
         name,
+        isDefault,
         entries: []
       };
       state.levels.push(level);
@@ -586,13 +669,13 @@
         levelEl.dataset.levelId = level.id;
         levelEl.innerHTML = `
           <div class="level-head">
-            <h3 class="level-title">Desordre sur ${escapeHtml(level.name)}</h3>
-            <div class="inline-actions">
-              <button class="secondary" type="button" data-action="add-entry">Ajouter une localisation</button>
-              <button class="danger" type="button" data-action="remove-level">Supprimer le niveau</button>
-            </div>
+            <h3 class="level-title">Désordres sur ${escapeHtml(level.name)}</h3>
           </div>
           <div class="entries"></div>
+          <div class="entry-actions">
+            <button class="secondary" type="button" data-action="add-entry">Ajouter une localisation</button>
+            ${level.isDefault ? "" : '<button class="danger" type="button" data-action="remove-level">Supprimer ce niveau</button>'}
+          </div>
         `;
 
         const entriesRoot = $(".entries", levelEl);
@@ -600,7 +683,8 @@
         levelsRoot.appendChild(levelEl);
 
         $('[data-action="add-entry"]', levelEl).addEventListener("click", () => addEntry(level.id));
-        $('[data-action="remove-level"]', levelEl).addEventListener("click", () => removeLevel(level.id));
+        const removeLevelButton = $('[data-action="remove-level"]', levelEl);
+        if (removeLevelButton) removeLevelButton.addEventListener("click", () => removeLevel(level.id));
       });
     }
 
@@ -609,46 +693,59 @@
       entryEl.className = "entry";
       entryEl.dataset.entryId = entry.id;
       entryEl.innerHTML = `
-        <div class="entry-head">
-          <div class="entry-title">Localisation ${index + 1}</div>
-          <button class="danger" type="button" data-action="remove-entry">Supprimer</button>
-        </div>
         <div class="grid">
           <div class="field full">
-            <label>Localisation</label>
-            <input type="text" data-field="localisation" value="${escapeHtml(entry.localisation)}" placeholder="Ex : facade avant, angle gauche, cage d'escalier">
+            <label>Localisation ${index + 1}</label>
+            <input type="text" data-field="localisation" value="${escapeHtml(entry.localisation)}" placeholder="Ex : façade avant, angle gauche, cage d'escalier">
           </div>
           <div class="field full">
             <label>Commentaire</label>
             <textarea data-field="comment">${escapeHtml(entry.comment)}</textarea>
           </div>
           <div class="field">
-            <label>Gravite</label>
+            <label>Gravité</label>
             <select data-field="gravity">${window.LISEC_DATA.gravites.map((value) => `<option value="${escapeHtml(value)}" ${entry.gravity === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>
           </div>
           <div class="field photos">
             <label>Photos</label>
-            <input type="file" accept="image/*" capture="environment" data-field="cameraPhotos">
-            <input type="file" accept="image/*" multiple data-field="galleryPhotos">
-            <div class="hint">Premier bouton : appareil photo. Second bouton : galerie avec plusieurs images. Les images sont compressees avant l'envoi.</div>
+            <div class="photo-buttons">
+              <label class="file-button" data-action="camera-label">Prendre une photo</label>
+              <input class="file-input" type="file" accept="image/*" capture="environment" data-field="cameraPhotos">
+              <label class="file-button secondary" data-action="gallery-label">Ajouter depuis la galerie</label>
+              <input class="file-input" type="file" accept="image/*" multiple data-field="galleryPhotos">
+            </div>
+            <div class="hint">Pour plusieurs photos à la suite, reprendre une photo autant de fois que nécessaire, ou sélectionner plusieurs images depuis la galerie.</div>
           </div>
         </div>
         <div class="photo-list"></div>
+        <div class="entry-actions">
+          <button class="secondary" type="button" data-action="add-entry-after">Ajouter une localisation</button>
+          <button class="danger" type="button" data-action="remove-entry">Supprimer cette localisation</button>
+        </div>
       `;
 
       $('[data-action="remove-entry"]', entryEl).addEventListener("click", () => removeEntry(levelId, entry.id));
+      $('[data-action="add-entry-after"]', entryEl).addEventListener("click", () => addEntry(levelId));
+      $('[data-action="camera-label"]', entryEl).addEventListener("click", () => $('[data-field="cameraPhotos"]', entryEl).click());
+      $('[data-action="gallery-label"]', entryEl).addEventListener("click", () => $('[data-field="galleryPhotos"]', entryEl).click());
       $('[data-field="localisation"]', entryEl).addEventListener("input", (event) => entry.localisation = event.target.value);
       $('[data-field="comment"]', entryEl).addEventListener("input", (event) => entry.comment = event.target.value);
       $('[data-field="gravity"]', entryEl).addEventListener("change", (event) => entry.gravity = event.target.value);
-      $('[data-field="cameraPhotos"]', entryEl).addEventListener("change", (event) => addPhotos(entry, event.target.files));
-      $('[data-field="galleryPhotos"]', entryEl).addEventListener("change", (event) => addPhotos(entry, event.target.files));
+      $('[data-field="cameraPhotos"]', entryEl).addEventListener("change", (event) => {
+        addPhotos(entry, event.target.files);
+        event.target.value = "";
+      });
+      $('[data-field="galleryPhotos"]', entryEl).addEventListener("change", (event) => {
+        addPhotos(entry, event.target.files);
+        event.target.value = "";
+      });
 
       renderPhotoList(entry, $(".photo-list", entryEl));
       return entryEl;
     }
 
     async function addPhotos(entry, files) {
-      setStatus("Preparation des photos...");
+        setStatus("Préparation des photos...");
       for (const file of Array.from(files || [])) {
         try {
           const compressed = await compressImage(file);
@@ -660,11 +757,11 @@
             dataUrl: compressed.dataUrl
           });
         } catch (error) {
-          setStatus(`Photo ignoree : ${file.name}`, true);
+          setStatus(`Photo ignorée : ${file.name}`, true);
         }
       }
       renderLevels();
-      setStatus("Photos ajoutees.", false, true);
+      setStatus("Photos ajoutées.", false, true);
     }
 
     function compressImage(file) {
@@ -708,11 +805,14 @@
       const payload = {
         submittedAt: new Date().toISOString(),
         company: "LISEC",
+        reportTitle: $("#reportTitle").value.trim(),
         visitDate: $("#visitDate").value,
+        visitTime: $("#visitTime").value,
         engineer: $("#engineer").value.trim(),
         recipientCivility: $("#recipientCivility").value,
         recipientName: $("#recipientName").value.trim(),
         siteAddress: $("#siteAddress").value.trim(),
+        presentPeople: $("#presentPeople").value.trim(),
         workDescription: $("#workDescription").value.trim(),
         construction: $("#construction").value.trim(),
         visitNote: $("#visitNote").value.trim(),
@@ -739,35 +839,37 @@
       $("#reviewContent").innerHTML = `
         <div class="review-block">
           <h3>Intervention</h3>
-          <p><strong>Date :</strong> ${escapeHtml(payload.visitDate)}</p>
-          <p><strong>Ingenieur :</strong> ${escapeHtml(payload.engineer)}</p>
+          <p><strong>Titre :</strong> ${escapeHtml(payload.reportTitle)}</p>
+          <p><strong>Date et heure :</strong> ${escapeHtml([payload.visitDate, payload.visitTime].filter(Boolean).join(" "))}</p>
+          <p><strong>Ingénieur :</strong> ${escapeHtml(payload.engineer)}</p>
           <p><strong>Destinataire :</strong> ${escapeHtml([payload.recipientCivility, payload.recipientName].filter(Boolean).join(" "))}</p>
           <p><strong>Adresse :</strong> ${escapeHtml(payload.siteAddress)}</p>
+          <p><strong>Personnes présentes :</strong> ${escapeHtml(payload.presentPeople || "Non renseigné")}</p>
         </div>
         <div class="review-block">
           <h3>Description</h3>
-          <p>${escapeHtml(payload.workDescription || "Non renseigne")}</p>
+          <p>${escapeHtml(payload.workDescription || "Non renseigné")}</p>
         </div>
         <div class="review-block">
           <h3>Construction</h3>
-          <p>${escapeHtml(payload.construction || "Non renseigne")}</p>
+          <p>${escapeHtml(payload.construction || "Non renseigné")}</p>
         </div>
         <div class="review-block">
-          <h3>Note particuliere</h3>
-          <p>${escapeHtml(payload.visitNote || "Non renseigne")}</p>
+          <h3>Note particulière</h3>
+          <p>${escapeHtml(payload.visitNote || "Non renseigné")}</p>
         </div>
         <div class="review-block">
-          <h3>Desordres</h3>
+          <h3>Désordres</h3>
           <p>${filledEntries} localisation(s), ${photoCount} photo(s).</p>
           ${payload.levels.map(renderLevelReview).join("")}
         </div>
         <div class="review-block">
           <h3>Conclusion</h3>
-          <p>${escapeHtml(payload.conclusion || "Non renseigne")}</p>
+          <p>${escapeHtml(payload.conclusion || "Non renseigné")}</p>
         </div>
         <div class="review-block">
-          <h3>Preconisation</h3>
-          <p>${escapeHtml(payload.recommendation || "Non renseigne")}</p>
+          <h3>Préconisation</h3>
+          <p>${escapeHtml(payload.recommendation || "Non renseigné")}</p>
         </div>
       `;
       $("#review").classList.add("open");
@@ -810,7 +912,7 @@
         const result = await response.json();
         if (!result.ok) throw new Error(result.error || "Erreur inconnue");
 
-        setStatus("Compte rendu envoye. Rapport et photos enregistres.", false, true);
+        setStatus("Compte rendu envoyé. Rapport et photos enregistrés.", false, true);
         $("#review").classList.remove("open");
         localStorage.removeItem(STORAGE_KEY);
       } catch (error) {
@@ -822,7 +924,7 @@
 
     function saveDraft() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(collectPayload()));
-      setStatus("Brouillon sauvegarde sur cet appareil.", false, true);
+      setStatus("Brouillon sauvegardé sur cet appareil.", false, true);
     }
 
     function restoreDraft() {
@@ -831,10 +933,13 @@
       try {
         const draft = JSON.parse(raw);
         $("#visitDate").value = draft.visitDate || $("#visitDate").value;
+        $("#visitTime").value = draft.visitTime || $("#visitTime").value;
+        $("#reportTitle").value = draft.reportTitle || "";
         $("#engineer").value = draft.engineer || "";
         $("#recipientCivility").value = draft.recipientCivility || "";
         $("#recipientName").value = draft.recipientName || "";
         $("#siteAddress").value = draft.siteAddress || "";
+        $("#presentPeople").value = draft.presentPeople || "- Sté Lisec";
         $("#workDescription").value = draft.workDescription || "";
         $("#construction").value = draft.construction || "";
         $("#visitNote").value = draft.visitNote || "";
@@ -844,6 +949,7 @@
           state.levels = draft.levels.map((level) => ({
             id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
             name: level.name,
+            isDefault: window.LISEC_DATA.niveaux.includes(level.name),
             entries: (level.entries || []).map((entry) => ({
               id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
               localisation: entry.localisation || "",
@@ -863,6 +969,11 @@
       const status = $("#status");
       status.textContent = message;
       status.className = `status${isError ? " error" : ""}${isOk ? " ok" : ""}`;
+    }
+
+    function currentTimeValue() {
+      const now = new Date();
+      return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     }
 
     function escapeHtml(value) {

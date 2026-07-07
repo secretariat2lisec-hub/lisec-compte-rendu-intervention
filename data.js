@@ -6,7 +6,7 @@ window.LISEC_DATA = {
     "Critique"
   ],
   niveaux: [
-    "Facade",
+    "Façade",
     "RDC",
     "R+1",
     "R+2",

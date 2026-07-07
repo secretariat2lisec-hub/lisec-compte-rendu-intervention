@@ -70,10 +70,13 @@ function setupDatabaseSheets_(spreadsheet) {
   first.appendRow([
     "ID intervention",
     "Date reception",
+    "Titre",
     "Date visite",
+    "Heure visite",
     "Ingenieur",
     "Destinataire",
     "Adresse / site",
+    "Personnes presentes",
     "Rapport",
     "Nombre photos"
   ]);
@@ -108,7 +111,7 @@ function ensureSheet_(spreadsheet, name, headers) {
 
 function writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords) {
   const interventions = ensureSheet_(spreadsheet, "Interventions", [
-    "ID intervention", "Date reception", "Date visite", "Ingenieur", "Destinataire", "Adresse / site", "Rapport", "Nombre photos"
+    "ID intervention", "Date reception", "Titre", "Date visite", "Heure visite", "Ingenieur", "Destinataire", "Adresse / site", "Personnes presentes", "Rapport", "Nombre photos"
   ]);
   const observations = ensureSheet_(spreadsheet, "Observations", [
     "ID intervention", "Niveau", "Localisation", "Gravite", "Commentaire"
@@ -120,10 +123,13 @@ function writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords
   interventions.appendRow([
     interventionId,
     new Date(),
+    payload.reportTitle || "",
     payload.visitDate || "",
+    payload.visitTime || "",
     payload.engineer || "",
     recipientLabel_(payload),
     payload.siteAddress || "",
+    payload.presentPeople || "",
     "",
     photoRecords.length
   ]);
@@ -156,10 +162,13 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
   const sheet = spreadsheet.insertSheet(sheetName);
 
   sheet.appendRow(["Compte rendu LISEC", interventionId]);
+  sheet.appendRow(["Titre", payload.reportTitle || ""]);
   sheet.appendRow(["Date de visite", payload.visitDate || ""]);
+  sheet.appendRow(["Heure de visite", payload.visitTime || ""]);
   sheet.appendRow(["Ingenieur", payload.engineer || ""]);
   sheet.appendRow(["Destinataire", recipientLabel_(payload)]);
   sheet.appendRow(["Adresse / site", payload.siteAddress || ""]);
+  sheet.appendRow(["Personnes presentes", payload.presentPeople || ""]);
   sheet.appendRow([]);
   sheet.appendRow(["Description de l'ouvrage"]);
   sheet.appendRow([payload.workDescription || ""]);
@@ -172,7 +181,7 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
   sheet.appendRow([]);
 
   (payload.levels || []).forEach((level) => {
-    sheet.appendRow([`Desordre sur ${level.name || ""}`]);
+    sheet.appendRow([`Desordres sur ${level.name || ""}`]);
     sheet.appendRow(["Localisation", "Gravite", "Commentaire", "Photos"]);
     (level.entries || []).forEach((entry) => {
       const links = photoRecords
@@ -254,10 +263,13 @@ function createReport_(payload, interventionId, interventionFolder, photoRecords
 function replacePlaceholders_(body, payload, interventionId) {
   const values = {
     "{{ID_INTERVENTION}}": interventionId,
+    "{{TITRE}}": payload.reportTitle || "",
     "{{DATE_VISITE}}": payload.visitDate || "",
+    "{{HEURE_VISITE}}": payload.visitTime || "",
     "{{INGENIEUR}}": payload.engineer || "",
     "{{DESTINATAIRE}}": recipientLabel_(payload),
     "{{ADRESSE_SITE}}": payload.siteAddress || "",
+    "{{PERSONNES_PRESENTES}}": payload.presentPeople || "",
     "{{DESCRIPTION_OUVRAGE}}": payload.workDescription || "",
     "{{CONSTRUCTION}}": payload.construction || "",
     "{{NOTE_VISITE}}": payload.visitNote || "",
@@ -273,12 +285,14 @@ function replacePlaceholders_(body, payload, interventionId) {
 function buildDefaultReport_(body, payload, interventionId, photoRecords) {
   body.clear();
   body.appendParagraph("NOTE TECHNIQUE").setHeading(DocumentApp.ParagraphHeading.TITLE);
-  body.appendParagraph("Compte rendu d'intervention").setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
+  body.appendParagraph(payload.reportTitle || "Compte rendu d'intervention").setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
   body.appendParagraph(`Reference : ${interventionId}`);
   body.appendParagraph(`Date de visite : ${payload.visitDate || ""}`);
+  body.appendParagraph(`Heure de visite : ${payload.visitTime || ""}`);
   body.appendParagraph(`Ingenieur : ${payload.engineer || ""}`);
   body.appendParagraph(`Destinataire : ${recipientLabel_(payload)}`);
   body.appendParagraph(`Adresse / site : ${payload.siteAddress || ""}`);
+  body.appendParagraph(`Personnes presentes : ${payload.presentPeople || ""}`);
   appendGeneratedSections_(body, payload, photoRecords);
 }
 
@@ -288,7 +302,7 @@ function appendGeneratedSections_(body, payload, photoRecords) {
   addSection_(body, "Note particuliere sur la visite", payload.visitNote);
 
   (payload.levels || []).forEach((level) => {
-    body.appendParagraph(`Desordre sur ${level.name || ""}`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(`Desordres sur ${level.name || ""}`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
     if (!(level.entries || []).length) {
       body.appendParagraph("Aucune localisation renseignee.");
     }
@@ -339,10 +353,13 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
     "",
     "Un nouveau compte rendu d'intervention LISEC a ete envoye.",
     "",
+    `Titre : ${payload.reportTitle || ""}`,
     `Date de visite : ${payload.visitDate || ""}`,
+    `Heure de visite : ${payload.visitTime || ""}`,
     `Ingenieur : ${payload.engineer || ""}`,
     `Destinataire : ${recipientLabel_(payload)}`,
     `Adresse / site : ${payload.siteAddress || ""}`,
+    `Personnes presentes : ${payload.presentPeople || ""}`,
     "",
     `Rapport Google Docs : ${reportFile.getUrl()}`,
     "",

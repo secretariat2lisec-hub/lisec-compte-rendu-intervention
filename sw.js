@@ -1,4 +1,4 @@
-const CACHE_NAME = "lisec-intervention-v1";
+const CACHE_NAME = "lisec-intervention-v3";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -27,9 +27,20 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).catch(() => caches.match("./index.html"));
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => cached || caches.match("./index.html"));
+      })
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });

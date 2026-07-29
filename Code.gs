@@ -70,13 +70,16 @@ function setupDatabaseSheets_(spreadsheet) {
   first.appendRow([
     "ID intervention",
     "Date reception",
-    "Titre",
     "Date visite",
     "Heure visite",
     "Ingenieur",
-    "Destinataire",
-    "Adresse / site",
+    "Client",
+    "Adresse",
+    "Code postal",
+    "Ville",
     "Personnes presentes",
+    "Mission",
+    "Diffusion",
     "Rapport",
     "Nombre photos"
   ]);
@@ -111,7 +114,7 @@ function ensureSheet_(spreadsheet, name, headers) {
 
 function writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords) {
   const interventions = ensureSheet_(spreadsheet, "Interventions", [
-    "ID intervention", "Date reception", "Titre", "Date visite", "Heure visite", "Ingenieur", "Destinataire", "Adresse / site", "Personnes presentes", "Rapport", "Nombre photos"
+    "ID intervention", "Date reception", "Date visite", "Heure visite", "Ingenieur", "Client", "Adresse", "Code postal", "Ville", "Personnes presentes", "Mission", "Diffusion", "Rapport", "Nombre photos"
   ]);
   const observations = ensureSheet_(spreadsheet, "Observations", [
     "ID intervention", "Niveau", "Localisation", "Gravite", "Commentaire"
@@ -123,13 +126,16 @@ function writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords
   interventions.appendRow([
     interventionId,
     new Date(),
-    payload.reportTitle || "",
     payload.visitDate || "",
     payload.visitTime || "",
     payload.engineer || "",
-    recipientLabel_(payload),
+    clientText_(payload),
     payload.siteAddress || "",
-    payload.presentPeople || "",
+    payload.postalCode || "",
+    payload.city || "",
+    presentPeopleText_(payload),
+    payload.mission || "",
+    diffusionText_(payload),
     "",
     photoRecords.length
   ]);
@@ -162,19 +168,22 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
   const sheet = spreadsheet.insertSheet(sheetName);
 
   sheet.appendRow(["Compte rendu LISEC", interventionId]);
-  sheet.appendRow(["Titre", payload.reportTitle || ""]);
   sheet.appendRow(["Date de visite", payload.visitDate || ""]);
   sheet.appendRow(["Heure de visite", payload.visitTime || ""]);
   sheet.appendRow(["Ingenieur", payload.engineer || ""]);
-  sheet.appendRow(["Destinataire", recipientLabel_(payload)]);
-  sheet.appendRow(["Adresse / site", payload.siteAddress || ""]);
-  sheet.appendRow(["Personnes presentes", payload.presentPeople || ""]);
+  sheet.appendRow(["Client", clientText_(payload)]);
+  sheet.appendRow(["Adresse", payload.siteAddress || ""]);
+  sheet.appendRow(["Code postal", payload.postalCode || ""]);
+  sheet.appendRow(["Ville", payload.city || ""]);
+  sheet.appendRow(["Personnes presentes", presentPeopleText_(payload)]);
+  sheet.appendRow(["Mission", payload.mission || ""]);
+  sheet.appendRow(["Diffusion", diffusionText_(payload)]);
   sheet.appendRow([]);
   sheet.appendRow(["Description de l'ouvrage"]);
   sheet.appendRow([payload.workDescription || ""]);
   sheet.appendRow([]);
   sheet.appendRow(["Construction"]);
-  sheet.appendRow([payload.construction || ""]);
+  sheet.appendRow([constructionText_(payload)]);
   sheet.appendRow([]);
   sheet.appendRow(["Note particuliere sur la visite"]);
   sheet.appendRow([payload.visitNote || ""]);
@@ -208,6 +217,27 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
 
 function savePhotos_(payload, interventionId, photoFolder) {
   const records = [];
+  const sitePhoto = payload.sitePhoto;
+  if (sitePhoto && sitePhoto.dataUrl) {
+    const base64 = String(sitePhoto.dataUrl).split(",").pop();
+    const bytes = Utilities.base64Decode(base64);
+    const fileName = "photo-du-lieu.jpg";
+    const blob = Utilities.newBlob(bytes, "image/jpeg", fileName);
+    const file = photoFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    records.push({
+      levelName: "Photo du lieu",
+      localisation: fullSiteAddress_(payload),
+      entryKey: "__SITE_PHOTO__",
+      isSitePhoto: true,
+      name: sitePhoto.name || fileName,
+      fileName,
+      url: file.getUrl(),
+      fileId: file.getId(),
+      blob
+    });
+  }
+
   (payload.levels || []).forEach((level) => {
     (level.entries || []).forEach((entry, entryIndex) => {
       (entry.photos || []).forEach((photo, photoIndex) => {
@@ -222,6 +252,7 @@ function savePhotos_(payload, interventionId, photoFolder) {
           levelName: level.name || "",
           localisation: entry.localisation || "",
           entryKey: entryKey_(level.name, entry),
+          isSitePhoto: false,
           name: photo.name || fileName,
           fileName,
           url: file.getUrl(),
@@ -263,15 +294,20 @@ function createReport_(payload, interventionId, interventionFolder, photoRecords
 function replacePlaceholders_(body, payload, interventionId) {
   const values = {
     "{{ID_INTERVENTION}}": interventionId,
-    "{{TITRE}}": payload.reportTitle || "",
+    "{{TITRE}}": "",
     "{{DATE_VISITE}}": payload.visitDate || "",
     "{{HEURE_VISITE}}": payload.visitTime || "",
     "{{INGENIEUR}}": payload.engineer || "",
-    "{{DESTINATAIRE}}": recipientLabel_(payload),
+    "{{DESTINATAIRE}}": clientText_(payload),
+    "{{CLIENT}}": clientText_(payload),
     "{{ADRESSE_SITE}}": payload.siteAddress || "",
-    "{{PERSONNES_PRESENTES}}": payload.presentPeople || "",
+    "{{CODE_POSTAL}}": payload.postalCode || "",
+    "{{VILLE}}": payload.city || "",
+    "{{MISSION}}": payload.mission || "",
+    "{{DIFFUSION}}": diffusionText_(payload),
+    "{{PERSONNES_PRESENTES}}": presentPeopleText_(payload),
     "{{DESCRIPTION_OUVRAGE}}": payload.workDescription || "",
-    "{{CONSTRUCTION}}": payload.construction || "",
+    "{{CONSTRUCTION}}": constructionText_(payload),
     "{{NOTE_VISITE}}": payload.visitNote || "",
     "{{CONCLUSION}}": payload.conclusion || "",
     "{{PRECONISATION}}": payload.recommendation || ""
@@ -284,57 +320,204 @@ function replacePlaceholders_(body, payload, interventionId) {
 
 function buildDefaultReport_(body, payload, interventionId, photoRecords) {
   body.clear();
-  body.appendParagraph("NOTE TECHNIQUE").setHeading(DocumentApp.ParagraphHeading.TITLE);
-  body.appendParagraph(payload.reportTitle || "Compte rendu d'intervention").setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
-  body.appendParagraph(`Reference : ${interventionId}`);
-  body.appendParagraph(`Date de visite : ${payload.visitDate || ""}`);
-  body.appendParagraph(`Heure de visite : ${payload.visitTime || ""}`);
-  body.appendParagraph(`Ingenieur : ${payload.engineer || ""}`);
-  body.appendParagraph(`Destinataire : ${recipientLabel_(payload)}`);
-  body.appendParagraph(`Adresse / site : ${payload.siteAddress || ""}`);
-  body.appendParagraph(`Personnes presentes : ${payload.presentPeople || ""}`);
+  body.appendParagraph("NOTE TECHNIQUE NT 1").setHeading(DocumentApp.ParagraphHeading.TITLE);
+  body.appendParagraph(payload.siteAddress || "").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  body.appendParagraph([payload.postalCode, payload.city].filter(Boolean).join(" ")).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  appendSitePhoto_(body, photoRecords);
+  appendMetaTable_(body, payload, interventionId);
   appendGeneratedSections_(body, payload, photoRecords);
 }
 
 function appendGeneratedSections_(body, payload, photoRecords) {
+  addSection_(body, "Mission", payload.mission);
   addSection_(body, "Description de l'ouvrage", payload.workDescription);
-  addSection_(body, "Construction", payload.construction);
+  addConstructionSection_(body, constructionText_(payload));
+
+  body.appendParagraph("Constatations sur site").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  appendLegendTable_(body);
   addSection_(body, "Note particuliere sur la visite", payload.visitNote);
 
   (payload.levels || []).forEach((level) => {
-    body.appendParagraph(`Desordres sur ${level.name || ""}`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-    if (!(level.entries || []).length) {
-      body.appendParagraph("Aucune localisation renseignee.");
-    }
-    (level.entries || []).forEach((entry, index) => {
-      body.appendParagraph(`Localisation ${index + 1} : ${entry.localisation || ""}`).setHeading(DocumentApp.ParagraphHeading.HEADING3);
-      body.appendParagraph(`Gravite : ${entry.gravity || ""}`);
-      body.appendParagraph(entry.comment || "");
-      const photos = photoRecords.filter((photo) => photo.entryKey === entryKey_(level.name, entry));
-      photos.forEach((photo) => {
-        try {
-          const image = body.appendImage(photo.blob);
-          const maxWidth = 420;
-          if (image.getWidth() > maxWidth) {
-            const ratio = maxWidth / image.getWidth();
-            image.setWidth(maxWidth);
-            image.setHeight(Math.round(image.getHeight() * ratio));
-          }
-          body.appendParagraph(photo.url);
-        } catch (error) {
-          body.appendParagraph(photo.url);
-        }
-      });
-    });
+    appendLevelSection_(body, level, photoRecords);
   });
 
   addSection_(body, "Conclusion", payload.conclusion);
   addSection_(body, "Preconisation", payload.recommendation);
+  addSection_(body, "Diffusion", diffusionText_(payload));
+}
+
+function appendSitePhoto_(body, photoRecords) {
+  const sitePhoto = (photoRecords || []).find((photo) => photo.isSitePhoto);
+  if (!sitePhoto) return;
+  try {
+    const image = body.appendImage(sitePhoto.blob);
+    const targetWidth = Math.min(460, image.getWidth());
+    const ratio = targetWidth / image.getWidth();
+    image.setWidth(targetWidth);
+    image.setHeight(Math.round(image.getHeight() * ratio));
+  } catch (error) {
+    body.appendParagraph(sitePhoto.url || "");
+  }
 }
 
 function addSection_(body, title, text) {
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING2);
   body.appendParagraph(text || "");
+}
+
+function addConstructionSection_(body, text) {
+  body.appendParagraph("Construction").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) {
+    body.appendParagraph("");
+    return;
+  }
+  lines.forEach((line) => {
+    const cleaned = line.replace(/^[-•]\s*/, "");
+    body.appendListItem(cleaned).setGlyphType(DocumentApp.GlyphType.BULLET);
+  });
+}
+
+function appendMetaTable_(body, payload, interventionId) {
+  const left = [
+    `RDV du : ${payload.visitDate || ""}${payload.visitTime ? " à " + payload.visitTime : ""}`,
+    "Présents :",
+    presentPeopleText_(payload),
+    `Référence LISEC : ${interventionId}`
+  ].join("\n");
+  const right = [
+    "Client :",
+    clientText_(payload),
+    fullSiteAddress_(payload)
+  ].join("\n");
+
+  const table = body.appendTable([[left, right]]);
+  table.setBorderWidth(0);
+  table.getCell(0, 0).setWidth(240);
+  table.getCell(0, 1).setWidth(240);
+  styleTableText_(table, 10, false);
+}
+
+function appendLegendTable_(body) {
+  const table = body.appendTable([
+    ["Code couleur", "Risque / Degré d'urgence du traitement", ""],
+    ["", "Risque faible", "Long terme (moins de 5 ans)"],
+    ["", "Risque moyen", "Moyen terme (moins de 2 ans)"],
+    ["", "Risque important", "Court terme (moins de 6 mois)"],
+    ["", "Risque imminent", "En urgence (sans délai)"]
+  ]);
+
+  const colors = ["#70AD47", "#FFC000", "#ED7D31", "#C00000"];
+  table.getRow(0).editAsText().setBold(true);
+  table.getCell(0, 0).setWidth(90);
+  table.getCell(0, 1).setWidth(190);
+  table.getCell(0, 2).setWidth(210);
+
+  for (let i = 1; i < table.getNumRows(); i++) {
+    table.getCell(i, 0).setBackgroundColor(colors[i - 1]);
+  }
+
+  styleTableText_(table, 9, false);
+  body.appendParagraph("");
+}
+
+function appendLevelSection_(body, level, photoRecords) {
+  body.appendParagraph(`Désordres sur ${level.name || ""}`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+
+  const entries = level.entries || [];
+  if (!entries.length) {
+    body.appendParagraph("Aucune localisation renseignée.");
+    return;
+  }
+
+  const rows = [];
+  entries.forEach(() => {
+    rows.push(["", ""]);
+    rows.push(["", ""]);
+  });
+  const table = body.appendTable(rows);
+  table.setBorderWidth(0.5);
+
+  entries.forEach((entry, index) => {
+    const textRow = table.getRow(index * 2);
+    const photoRow = table.getRow(index * 2 + 1);
+    const colorCellTop = textRow.getCell(0);
+    const colorCellBottom = photoRow.getCell(0);
+    const contentCell = textRow.getCell(1);
+    const photosCell = photoRow.getCell(1);
+    const photos = photoRecords.filter((photo) => photo.entryKey === entryKey_(level.name, entry));
+    const gravityColor = gravityColor_(entry.gravity);
+
+    colorCellTop.setWidth(16);
+    colorCellBottom.setWidth(16);
+    colorCellTop.setBackgroundColor(gravityColor);
+    colorCellBottom.setBackgroundColor(gravityColor);
+    contentCell.setWidth(500);
+    photosCell.setWidth(500);
+
+    clearCell_(colorCellTop);
+    clearCell_(colorCellBottom);
+    clearCell_(contentCell);
+    clearCell_(photosCell);
+
+    const title = contentCell.appendParagraph(`Localisation ${index + 1} : ${entry.localisation || ""}`);
+    title.editAsText().setBold(true);
+    contentCell.appendParagraph(entry.comment || "");
+
+    appendPhotosToCell_(photosCell, photos);
+  });
+
+  styleTableText_(table, 10, false);
+  body.appendParagraph("");
+}
+
+function appendPhotosToCell_(cell, photos) {
+  if (!photos.length) {
+    cell.appendParagraph("");
+    return;
+  }
+
+  const paragraph = cell.appendParagraph("");
+  photos.forEach((photo, index) => {
+    try {
+      const image = paragraph.appendInlineImage(photo.blob);
+      const targetWidth = Math.max(60, Math.round(image.getWidth() * 0.15));
+      const ratio = targetWidth / image.getWidth();
+      image.setWidth(targetWidth);
+      image.setHeight(Math.round(image.getHeight() * ratio));
+      if (index < photos.length - 1) paragraph.appendText("     ");
+    } catch (error) {
+      paragraph.appendText(photo.url);
+      if (index < photos.length - 1) paragraph.appendText("     ");
+    }
+  });
+}
+
+function clearCell_(cell) {
+  while (cell.getNumChildren() > 0) {
+    cell.removeChild(cell.getChild(0));
+  }
+}
+
+function styleTableText_(table, size, boldHeader) {
+  for (let r = 0; r < table.getNumRows(); r++) {
+    const row = table.getRow(r);
+    for (let c = 0; c < row.getNumCells(); c++) {
+      const text = row.getCell(c).editAsText();
+      text.setFontFamily("Arial");
+      text.setFontSize(size);
+      if (boldHeader && r === 0) text.setBold(true);
+    }
+  }
+}
+
+function gravityColor_(gravity) {
+  const value = String(gravity || "").toLowerCase();
+  if (value.indexOf("faible") !== -1) return "#70AD47";
+  if (value.indexOf("moyenne") !== -1 || value.indexOf("moyen") !== -1) return "#FFC000";
+  if (value.indexOf("forte") !== -1 || value.indexOf("important") !== -1) return "#ED7D31";
+  if (value.indexOf("critique") !== -1 || value.indexOf("imminent") !== -1) return "#C00000";
+  return "#D9EAD3";
 }
 
 function exportGoogleDocAsDocx_(docId, fileName) {
@@ -353,13 +536,14 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
     "",
     "Un nouveau compte rendu d'intervention LISEC a ete envoye.",
     "",
-    `Titre : ${payload.reportTitle || ""}`,
     `Date de visite : ${payload.visitDate || ""}`,
     `Heure de visite : ${payload.visitTime || ""}`,
     `Ingenieur : ${payload.engineer || ""}`,
-    `Destinataire : ${recipientLabel_(payload)}`,
-    `Adresse / site : ${payload.siteAddress || ""}`,
-    `Personnes presentes : ${payload.presentPeople || ""}`,
+    `Client : ${clientText_(payload)}`,
+    `Lieu de la visite : ${fullSiteAddress_(payload)}`,
+    `Personnes presentes : ${presentPeopleText_(payload)}`,
+    `Mission : ${payload.mission || ""}`,
+    `Diffusion : ${diffusionText_(payload)}`,
     "",
     `Rapport Google Docs : ${reportFile.getUrl()}`,
     "",
@@ -399,11 +583,40 @@ function getOrCreateSubFolder_(parent, name) {
   return folders.hasNext() ? folders.next() : parent.createFolder(name);
 }
 
-function recipientLabel_(payload) {
-  return [payload.recipientCivility || "", payload.recipientName || ""].filter(Boolean).join(" ");
+function clientText_(payload) {
+  return payload.clientBlock || [payload.recipientCivility || "", payload.recipientName || ""].filter(Boolean).join(" ");
+}
+
+function fullSiteAddress_(payload) {
+  return [
+    payload.siteAddress || "",
+    [payload.postalCode || "", payload.city || ""].filter(Boolean).join(" ")
+  ].filter(Boolean).join("\n");
+}
+
+function presentPeopleText_(payload) {
+  if (Array.isArray(payload.presentPeopleEntries)) {
+    return payload.presentPeopleEntries.filter(Boolean).join("\n");
+  }
+  return payload.presentPeople || "";
+}
+
+function constructionText_(payload) {
+  if (Array.isArray(payload.constructionItems)) {
+    return payload.constructionItems.filter(Boolean).join("\n");
+  }
+  return payload.construction || "";
+}
+
+function diffusionText_(payload) {
+  if (Array.isArray(payload.diffusionEntries)) {
+    return payload.diffusionEntries.filter(Boolean).join("\n");
+  }
+  return payload.diffusion || "";
 }
 
 function entryKey_(levelName, entry) {
+  if (entry && entry.id) return String(entry.id);
   return [levelName || "", entry.localisation || "", entry.comment || "", entry.gravity || ""].join("||");
 }
 

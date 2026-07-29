@@ -6,7 +6,14 @@ Ce dossier contient une premiere version complete de l'application mobile et du 
 
 - Application web mobile pour GitHub Pages.
 - Utilisation sur tablette et telephone Android/Samsung.
-- Aucun champ obligatoire.
+- Aucun champ obligatoire : le secretariat pourra completer les informations dans une phase ulterieure.
+- Lieu de la visite separe en adresse, code postal et ville.
+- Photo du lieu distincte, prise avec l'appareil photo ou ajoutee depuis la galerie.
+- Client saisi dans un bloc libre comprenant le nom et l'adresse complete.
+- Mission saisie dans un bloc libre.
+- Quatre champs distincts pour les personnes presentes.
+- Six champs distincts pour les elements de construction ; les champs vides sont ignores.
+- Trois champs facultatifs pour les noms de diffusion.
 - Niveaux fixes : Facade, RDC, R+1, R+2, R+3.
 - Possibilite d'ajouter un niveau en plus.
 - Possibilite d'ajouter autant de localisations que necessaire par niveau.
@@ -50,6 +57,10 @@ Le plus fiable est de creer un modele Google Docs LISEC avec des champs comme :
 - `{{INGENIEUR}}`
 - `{{DESTINATAIRE}}`
 - `{{ADRESSE_SITE}}`
+- `{{CODE_POSTAL}}`
+- `{{VILLE}}`
+- `{{CLIENT}}`
+- `{{MISSION}}`
 - `{{DESCRIPTION_OUVRAGE}}`
 - `{{CONSTRUCTION}}`
 - `{{NOTE_VISITE}}`

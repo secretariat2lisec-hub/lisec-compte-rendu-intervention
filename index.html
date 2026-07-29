@@ -134,6 +134,20 @@
       padding-right: 9px;
     }
 
+    .postal-row,
+    .people-grid,
+    .construction-list {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .diffusion-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .field {
       display: grid;
       gap: 7px;
@@ -368,6 +382,32 @@
       word-break: break-word;
     }
 
+    .site-photo-preview {
+      display: none;
+      width: min(360px, 100%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #f4f3fa;
+    }
+
+    .site-photo-preview.has-photo {
+      display: grid;
+      gap: 0;
+    }
+
+    .site-photo-preview img {
+      display: block;
+      width: 100%;
+      max-height: 280px;
+      object-fit: contain;
+      background: #fff;
+    }
+
+    .site-photo-preview button {
+      border-radius: 0;
+    }
+
     .status {
       min-height: 28px;
       color: var(--muted);
@@ -463,7 +503,11 @@
     }
 
     @media (max-width: 520px) {
-      .visit-row {
+      .visit-row,
+      .postal-row,
+      .people-grid,
+      .construction-list,
+      .diffusion-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -483,10 +527,6 @@
       <section>
         <h2>Intervention</h2>
         <div class="grid">
-          <div class="field">
-            <label for="reportTitle">Titre</label>
-            <input id="reportTitle" name="reportTitle" type="text">
-          </div>
           <div class="visit-row">
             <div class="field">
               <label for="visitDate">Date de visite</label>
@@ -501,13 +541,76 @@
             <label for="engineer">Nom de l'ingénieur</label>
             <input id="engineer" name="engineer" type="text" autocomplete="name">
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Lieu de la visite</h2>
+        <div class="grid">
           <div class="field full">
-            <label for="siteAddress">Adresse / site visite</label>
+            <label for="siteAddress">Adresse</label>
             <input id="siteAddress" name="siteAddress" type="text" autocomplete="street-address">
           </div>
-          <div class="field full">
-            <label for="presentPeople">Personnes présentes</label>
-            <textarea id="presentPeople" name="presentPeople" placeholder="- Nom 1&#10;- Nom 2&#10;- Sté Lisec">- Sté Lisec</textarea>
+          <div class="postal-row full">
+            <div class="field">
+              <label for="postalCode">Code postal</label>
+              <input id="postalCode" name="postalCode" type="text" inputmode="numeric" autocomplete="postal-code">
+            </div>
+            <div class="field">
+              <label for="city">Ville</label>
+              <input id="city" name="city" type="text" autocomplete="address-level2">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Photo du lieu</h2>
+        <div class="field photos">
+          <div class="photo-buttons">
+            <label class="file-button" for="siteCameraPhoto">Prendre une photo</label>
+            <input class="file-input" id="siteCameraPhoto" type="file" accept="image/*" capture="environment">
+            <label class="file-button secondary" for="siteGalleryPhoto">Ajouter depuis la galerie</label>
+            <input class="file-input" id="siteGalleryPhoto" type="file" accept="image/*">
+          </div>
+          <div class="site-photo-preview" id="sitePhotoPreview"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Client</h2>
+        <div class="field">
+          <label for="clientBlock">Nom et adresse complète du client</label>
+          <textarea id="clientBlock" name="clientBlock"></textarea>
+        </div>
+      </section>
+
+      <section>
+        <h2>Mission</h2>
+        <div class="field">
+          <label for="mission">Texte de la mission</label>
+          <textarea id="mission" name="mission"></textarea>
+        </div>
+      </section>
+
+      <section>
+        <h2>Personnes présentes</h2>
+        <div class="people-grid">
+          <div class="field">
+            <label for="presentPerson1">Personne 1</label>
+            <input id="presentPerson1" name="presentPerson1" type="text">
+          </div>
+          <div class="field">
+            <label for="presentPerson2">Personne 2</label>
+            <input id="presentPerson2" name="presentPerson2" type="text">
+          </div>
+          <div class="field">
+            <label for="presentPerson3">Personne 3</label>
+            <input id="presentPerson3" name="presentPerson3" type="text">
+          </div>
+          <div class="field">
+            <label for="presentPerson4">Personne 4</label>
+            <input id="presentPerson4" name="presentPerson4" type="text">
           </div>
         </div>
       </section>
@@ -520,14 +623,21 @@
             <textarea id="workDescription" name="workDescription"></textarea>
           </div>
           <div class="field full">
-            <label for="construction">Construction</label>
-            <textarea id="construction" name="construction" placeholder="- Element 1&#10;- Element 2&#10;- Element 3"></textarea>
-            <div class="hint">Saisir 5 ou 6 tirets si besoin.</div>
-          </div>
-          <div class="field full">
             <label for="visitNote">Note particulière sur la visite</label>
             <textarea id="visitNote" name="visitNote"></textarea>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Construction</h2>
+        <div class="construction-list">
+          <div class="field"><label for="construction1">Élément 1</label><input id="construction1" type="text"></div>
+          <div class="field"><label for="construction2">Élément 2</label><input id="construction2" type="text"></div>
+          <div class="field"><label for="construction3">Élément 3</label><input id="construction3" type="text"></div>
+          <div class="field"><label for="construction4">Élément 4</label><input id="construction4" type="text"></div>
+          <div class="field"><label for="construction5">Élément 5</label><input id="construction5" type="text"></div>
+          <div class="field"><label for="construction6">Élément 6</label><input id="construction6" type="text"></div>
         </div>
       </section>
 
@@ -556,15 +666,19 @@
       </section>
 
       <section>
-        <h2>Destinataire du rapport</h2>
-        <div class="grid">
+        <h2>Diffusion</h2>
+        <div class="diffusion-grid">
           <div class="field">
-            <label for="recipientCivility">Civilité</label>
-            <select id="recipientCivility" name="recipientCivility"></select>
+            <label for="diffusion1">Nom 1</label>
+            <input id="diffusion1" name="diffusion1" type="text">
           </div>
           <div class="field">
-            <label for="recipientName">Nom</label>
-            <input id="recipientName" name="recipientName" type="text" autocomplete="name">
+            <label for="diffusion2">Nom 2</label>
+            <input id="diffusion2" name="diffusion2" type="text">
+          </div>
+          <div class="field">
+            <label for="diffusion3">Nom 3</label>
+            <input id="diffusion3" name="diffusion3" type="text">
           </div>
         </div>
       </section>
@@ -589,17 +703,19 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-07-4"></script>
+  <script src="data.js?v=2026-07-29-2"></script>
   <script>
-    const APP_VERSION = "2026-07-07-4";
+    const APP_VERSION = "2026-07-29-2";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.82;
-    const STORAGE_KEY = "lisec_intervention_draft_v1";
+    const STORAGE_KEY = "lisec_intervention_draft_v2";
+    const LEGACY_STORAGE_KEY = "lisec_intervention_draft_v1";
     const GOOGLE_APPS_SCRIPT_URL = "";
 
     const state = {
       levels: [],
-      photoId: 1
+      photoId: 1,
+      sitePhoto: null
     };
 
     const $ = (selector, root = document) => root.querySelector(selector);
@@ -607,7 +723,6 @@
 
     function init() {
       ensureFreshVersion();
-      fillSelect($("#recipientCivility"), window.LISEC_DATA.civilites);
       window.LISEC_DATA.niveaux.forEach((name) => addLevel(name, false, true));
       $("#visitDate").valueAsDate = new Date();
       $("#visitTime").value = currentTimeValue();
@@ -635,10 +750,8 @@
       $("#closeReviewBtn").addEventListener("click", () => $("#review").classList.remove("open"));
       $("#sendBtn").addEventListener("click", sendReport);
       $("#saveBtn").addEventListener("click", saveDraft);
-    }
-
-    function fillSelect(select, values) {
-      select.innerHTML = values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value || "Selectionner")}</option>`).join("");
+      $("#siteCameraPhoto").addEventListener("change", handleSitePhotoSelection);
+      $("#siteGalleryPhoto").addEventListener("change", handleSitePhotoSelection);
     }
 
     function addLevel(name, withFirstEntry = false, isDefault = false) {
@@ -783,6 +896,47 @@
       setStatus("Photos ajoutées.", false, true);
     }
 
+    async function handleSitePhotoSelection(event) {
+      const file = Array.from(event.target.files || [])[0];
+      event.target.value = "";
+      if (!file) return;
+      setStatus("Préparation de la photo du lieu...");
+      try {
+        const compressed = await compressImage(file);
+        state.sitePhoto = {
+          id: state.photoId++,
+          name: file.name || "photo-du-lieu.jpg",
+          type: "image/jpeg",
+          size: compressed.size,
+          dataUrl: compressed.dataUrl
+        };
+        renderSitePhoto();
+        setStatus("Photo du lieu ajoutée.", false, true);
+      } catch (error) {
+        setStatus(`Photo ignorée : ${file.name}`, true);
+      }
+    }
+
+    function renderSitePhoto() {
+      const preview = $("#sitePhotoPreview");
+      preview.innerHTML = "";
+      preview.classList.toggle("has-photo", Boolean(state.sitePhoto));
+      if (!state.sitePhoto) return;
+
+      const image = document.createElement("img");
+      image.src = state.sitePhoto.dataUrl;
+      image.alt = "Photo du lieu";
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "danger";
+      removeButton.textContent = "Supprimer la photo";
+      removeButton.addEventListener("click", () => {
+        state.sitePhoto = null;
+        renderSitePhoto();
+      });
+      preview.append(image, removeButton);
+    }
+
     function compressImage(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -821,25 +975,39 @@
     }
 
     function collectPayload() {
+      const presentPeopleEntries = [1, 2, 3, 4]
+        .map((index) => $(`#presentPerson${index}`).value.trim());
+      const constructionItems = [1, 2, 3, 4, 5, 6]
+        .map((index) => $(`#construction${index}`).value.trim());
+      const diffusionEntries = [1, 2, 3]
+        .map((index) => $(`#diffusion${index}`).value.trim());
       const payload = {
         submittedAt: new Date().toISOString(),
         company: "LISEC",
-        reportTitle: $("#reportTitle").value.trim(),
         visitDate: $("#visitDate").value,
         visitTime: $("#visitTime").value,
         engineer: $("#engineer").value.trim(),
-        recipientCivility: $("#recipientCivility").value,
-        recipientName: $("#recipientName").value.trim(),
         siteAddress: $("#siteAddress").value.trim(),
-        presentPeople: $("#presentPeople").value.trim(),
+        postalCode: $("#postalCode").value.trim(),
+        city: $("#city").value.trim(),
+        sitePhoto: state.sitePhoto,
+        clientBlock: $("#clientBlock").value.trim(),
+        mission: $("#mission").value.trim(),
+        presentPeopleEntries,
+        presentPeople: presentPeopleEntries.filter(Boolean).join("\n"),
         workDescription: $("#workDescription").value.trim(),
-        construction: $("#construction").value.trim(),
+        constructionItems,
+        construction: constructionItems.filter(Boolean).join("\n"),
         visitNote: $("#visitNote").value.trim(),
         conclusion: $("#conclusion").value.trim(),
         recommendation: $("#recommendation").value.trim(),
+        diffusionEntries,
+        diffusion: diffusionEntries.filter(Boolean).join("\n"),
         levels: state.levels.map((level) => ({
+          id: level.id,
           name: level.name,
           entries: level.entries.map((entry) => ({
+            id: entry.id,
             localisation: entry.localisation,
             comment: entry.comment,
             gravity: entry.gravity,
@@ -858,12 +1026,26 @@
       $("#reviewContent").innerHTML = `
         <div class="review-block">
           <h3>Intervention</h3>
-          <p><strong>Titre :</strong> ${escapeHtml(payload.reportTitle)}</p>
           <p><strong>Date et heure :</strong> ${escapeHtml([payload.visitDate, payload.visitTime].filter(Boolean).join(" "))}</p>
           <p><strong>Ingénieur :</strong> ${escapeHtml(payload.engineer)}</p>
-          <p><strong>Destinataire :</strong> ${escapeHtml([payload.recipientCivility, payload.recipientName].filter(Boolean).join(" "))}</p>
-          <p><strong>Adresse :</strong> ${escapeHtml(payload.siteAddress)}</p>
-          <p><strong>Personnes présentes :</strong> ${escapeHtml(payload.presentPeople || "Non renseigné")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Lieu de la visite</h3>
+          <p>${escapeHtml(payload.siteAddress || "Non renseigné")}</p>
+          <p>${escapeHtml([payload.postalCode, payload.city].filter(Boolean).join(" ") || "Code postal et ville non renseignés")}</p>
+          <p><strong>Photo du lieu :</strong> ${payload.sitePhoto ? "1 photo" : "Non renseignée"}</p>
+        </div>
+        <div class="review-block">
+          <h3>Client</h3>
+          <p>${escapeHtml(payload.clientBlock || "Non renseigné")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Mission</h3>
+          <p>${escapeHtml(payload.mission || "Non renseignée")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Personnes présentes</h3>
+          <p>${escapeHtml(payload.presentPeople || "Non renseigné")}</p>
         </div>
         <div class="review-block">
           <h3>Description</h3>
@@ -871,7 +1053,7 @@
         </div>
         <div class="review-block">
           <h3>Construction</h3>
-          <p>${escapeHtml(payload.construction || "Non renseigné")}</p>
+          <p>${escapeHtml(payload.constructionItems.filter(Boolean).map((item) => `- ${item}`).join("\n") || "Non renseignée")}</p>
         </div>
         <div class="review-block">
           <h3>Note particulière</h3>
@@ -889,6 +1071,10 @@
         <div class="review-block">
           <h3>Préconisation</h3>
           <p>${escapeHtml(payload.recommendation || "Non renseigné")}</p>
+        </div>
+        <div class="review-block">
+          <h3>Diffusion</h3>
+          <p>${escapeHtml(payload.diffusion || "Non renseignée")}</p>
         </div>
       `;
       $("#review").classList.add("open");
@@ -942,35 +1128,58 @@
     }
 
     function saveDraft() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(collectPayload()));
-      setStatus("Brouillon sauvegardé sur cet appareil.", false, true);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(collectPayload()));
+        setStatus("Brouillon sauvegardé sur cet appareil.", false, true);
+      } catch (error) {
+        setStatus("Le brouillon est trop volumineux pour être sauvegardé sur cet appareil.", true);
+      }
     }
 
     function restoreDraft() {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (!raw) return;
       try {
         const draft = JSON.parse(raw);
         $("#visitDate").value = draft.visitDate || $("#visitDate").value;
         $("#visitTime").value = draft.visitTime || $("#visitTime").value;
-        $("#reportTitle").value = draft.reportTitle || "";
         $("#engineer").value = draft.engineer || "";
-        $("#recipientCivility").value = draft.recipientCivility || "";
-        $("#recipientName").value = draft.recipientName || "";
         $("#siteAddress").value = draft.siteAddress || "";
-        $("#presentPeople").value = draft.presentPeople || "- Sté Lisec";
+        $("#postalCode").value = draft.postalCode || "";
+        $("#city").value = draft.city || "";
+        $("#clientBlock").value = draft.clientBlock || [draft.recipientCivility, draft.recipientName].filter(Boolean).join(" ");
+        $("#mission").value = draft.mission || draft.reportTitle || "";
+        const presentPeopleEntries = Array.isArray(draft.presentPeopleEntries)
+          ? draft.presentPeopleEntries
+          : String(draft.presentPeople || "").split(/\r?\n/);
+        [1, 2, 3, 4].forEach((index) => {
+          $(`#presentPerson${index}`).value = presentPeopleEntries[index - 1] || "";
+        });
         $("#workDescription").value = draft.workDescription || "";
-        $("#construction").value = draft.construction || "";
+        const constructionItems = Array.isArray(draft.constructionItems)
+          ? draft.constructionItems
+          : String(draft.construction || "").split(/\r?\n/).map((item) => item.replace(/^[-•]\s*/, ""));
+        [1, 2, 3, 4, 5, 6].forEach((index) => {
+          $(`#construction${index}`).value = constructionItems[index - 1] || "";
+        });
+        state.sitePhoto = draft.sitePhoto || null;
+        renderSitePhoto();
         $("#visitNote").value = draft.visitNote || "";
         $("#conclusion").value = draft.conclusion || "";
         $("#recommendation").value = draft.recommendation || "";
+        const diffusionEntries = Array.isArray(draft.diffusionEntries)
+          ? draft.diffusionEntries
+          : String(draft.diffusion || "").split(/\r?\n/);
+        [1, 2, 3].forEach((index) => {
+          $(`#diffusion${index}`).value = diffusionEntries[index - 1] || "";
+        });
         if (Array.isArray(draft.levels) && draft.levels.length) {
           state.levels = draft.levels.map((level) => ({
-            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+            id: level.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
             name: level.name,
             isDefault: window.LISEC_DATA.niveaux.includes(level.name),
             entries: (level.entries || []).map((entry) => ({
-              id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+              id: entry.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
               localisation: entry.localisation || "",
               comment: entry.comment || "",
               gravity: entry.gravity || "",

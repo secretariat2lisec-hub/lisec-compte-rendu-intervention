@@ -27,6 +27,7 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
   const constatsXml = wordConstatsXml_(state, payload, photoRecords || []);
   documentXml = replaceWordParagraphToken_(documentXml, "{{BLOC_CONSTATS}}", constatsXml);
   documentXml = replaceWordParagraphToken_(documentXml, "{{BLOC_VERIFICATIONS_STRUCTURELLES}}", "");
+  documentXml = replaceWordParagraphToken_(documentXml, "{{CONSTRUCTION}}", wordConstructionXml_(payload));
 
   documentXml = removeWordParagraphContaining_(documentXml, "{{CARTE_LOCALISATION}}");
   documentXml = removeWordParagraphContaining_(documentXml, "Ci-dessous une vue satellite");
@@ -45,10 +46,9 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
     "{{VILLE}}": payload.city || "",
     "{{DATE_VISITE}}": payload.visitDate || "",
     "{{HEURE_VISITE}}": payload.visitTime || "",
-    "{{PERSONNES_PRESENTES}}": presentPeopleText_(payload),
+    "{{PERSONNES_PRESENTES}}": presentPeopleForWord_(payload),
     "{{INGENIEUR}}": payload.engineer || "",
     "{{DESCRIPTION_OUVRAGE}}": payload.workDescription || "",
-    "{{CONSTRUCTION}}": constructionForWord_(payload),
     "{{NOTE_VISITE}}": payload.visitNote || "",
     "{{CONCLUSION}}": payload.conclusion || "",
     "{{PRECONISATION}}": payload.recommendation || ""
@@ -142,15 +142,25 @@ function escapeWordXml_(value) {
     .replace(/'/g, "&apos;");
 }
 
-function constructionForWord_(payload) {
+function presentPeopleForWord_(payload) {
+  const people = Array.isArray(payload.presentPeopleEntries)
+    ? payload.presentPeopleEntries
+    : String(payload.presentPeople || "").split(/\r?\n/);
+  return people.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+}
+
+function wordConstructionXml_(payload) {
   const items = Array.isArray(payload.constructionItems)
     ? payload.constructionItems
     : String(payload.construction || "").split(/\r?\n/);
-  return items.map((item) => String(item || "").trim()).filter(Boolean).map((item) => "- " + item).join("\n");
+  return items.map((item) => String(item || "").trim()).filter(Boolean).map((item) =>
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="60"/><w:jc w:val="left"/></w:pPr>' +
+    '<w:r><w:t xml:space="preserve">- ' + escapeWordXml_(item) + '</w:t></w:r></w:p>'
+  ).join("");
 }
 
 function wordBodyParagraphXml_(text) {
-  return '<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr><w:r><w:t xml:space="preserve">' +
+  return '<w:p><w:pPr><w:spacing w:before="0" w:after="120"/><w:jc w:val="left"/></w:pPr><w:r><w:t xml:space="preserve">' +
     wordInlineText_(text) +
     "</w:t></w:r></w:p>";
 }

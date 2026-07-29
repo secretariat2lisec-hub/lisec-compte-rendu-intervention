@@ -719,9 +719,9 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-29-5"></script>
+  <script src="data.js?v=2026-07-29-6"></script>
   <script>
-    const APP_VERSION = "2026-07-29-5";
+    const APP_VERSION = "2026-07-29-6";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.72;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
@@ -1177,18 +1177,20 @@
       try {
         const response = await fetch(scriptUrl, {
           method: "POST",
-          mode: "cors",
+          mode: "no-cors",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
 
-        const result = await response.json();
-        if (!result.ok) throw new Error(result.error || "Erreur inconnue");
+        if (response.type !== "opaque") {
+          const result = await response.json();
+          if (!result.ok) throw new Error(result.error || "Erreur inconnue");
+        }
 
         setStatus(
           action === "completion"
-            ? "Dossier envoyé au secrétariat pour complément."
-            : "Rapport généré et envoyé avec les photos.",
+            ? "Dossier transmis au secrétariat. Son traitement peut prendre quelques instants."
+            : "Rapport transmis pour génération et envoi.",
           false,
           true
         );

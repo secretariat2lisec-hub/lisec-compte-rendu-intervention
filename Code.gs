@@ -21,17 +21,36 @@ const DOSSIER_HEADERS = [
 ];
 
 function doPost(e) {
+  const properties = PropertiesService.getScriptProperties();
   try {
     const payload = JSON.parse(e.postData.contents || "{}");
     const result = handleSubmission(payload);
+    properties.setProperty("LAST_SUBMISSION_DIAGNOSTIC", JSON.stringify({
+      ok: true,
+      at: new Date().toISOString(),
+      interventionId: result.interventionId || "",
+      workflowAction: result.workflowAction || ""
+    }));
     return jsonResponse({ ok: true, result });
   } catch (error) {
-    console.error(error && error.stack ? error.stack : error);
+    const detail = String(error && error.stack ? error.stack : error);
+    console.error(detail);
+    properties.setProperty("LAST_SUBMISSION_DIAGNOSTIC", JSON.stringify({
+      ok: false,
+      at: new Date().toISOString(),
+      error: detail
+    }));
     return jsonResponse({ ok: false, error: String(error && error.message ? error.message : error) });
   }
 }
 
 function doGet(e) {
+  if (e && e.parameter && e.parameter.api === "last-submission") {
+    assertSecretariatAccess_({ accessCode: e.parameter.accessCode || "" });
+    const raw = PropertiesService.getScriptProperties().getProperty("LAST_SUBMISSION_DIAGNOSTIC");
+    return jsonResponse(raw ? JSON.parse(raw) : { ok: false, error: "Aucun diagnostic disponible." });
+  }
+
   if (e && e.parameter && e.parameter.api === "status") {
     return jsonResponse({ ok: true, message: "LISEC Apps Script pret a recevoir les comptes rendus." });
   }
@@ -518,16 +537,16 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
   sheet.appendRow(["Personnes presentes", presentPeopleText_(payload)]);
   sheet.appendRow(["Mission", payload.mission || ""]);
   sheet.appendRow(["Diffusion", diffusionText_(payload)]);
-  sheet.appendRow([]);
+  sheet.appendRow([""]);
   sheet.appendRow(["Description de l'ouvrage"]);
   sheet.appendRow([payload.workDescription || ""]);
-  sheet.appendRow([]);
+  sheet.appendRow([""]);
   sheet.appendRow(["Construction"]);
   sheet.appendRow([constructionText_(payload)]);
-  sheet.appendRow([]);
+  sheet.appendRow([""]);
   sheet.appendRow(["Note particuliere sur la visite"]);
   sheet.appendRow([payload.visitNote || ""]);
-  sheet.appendRow([]);
+  sheet.appendRow([""]);
 
   (payload.levels || []).forEach((level) => {
     sheet.appendRow([`Desordres sur ${level.name || ""}`]);
@@ -544,12 +563,12 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
         links
       ]);
     });
-    sheet.appendRow([]);
+    sheet.appendRow([""]);
   });
 
   sheet.appendRow(["Conclusion"]);
   sheet.appendRow([payload.conclusion || ""]);
-  sheet.appendRow([]);
+  sheet.appendRow([""]);
   sheet.appendRow(["Preconisation"]);
   sheet.appendRow([payload.recommendation || ""]);
   sheet.autoResizeColumns(1, 4);
@@ -772,31 +791,33 @@ function appendLevelSection_(body, level, photoRecords) {
 
   const rows = [];
   entries.forEach(() => {
-    rows.push(["", ""]);
-    rows.push(["", ""]);
+    rows.push([""]);
+    rows.push([""]);
+    rows.push([""]);
   });
   const table = body.appendTable(rows);
   table.setBorderWidth(0.5);
 
   entries.forEach((entry, index) => {
-    const textRow = table.getRow(index * 2);
-    const photoRow = table.getRow(index * 2 + 1);
-    const colorCellTop = textRow.getCell(0);
-    const colorCellBottom = photoRow.getCell(0);
-    const contentCell = textRow.getCell(1);
-    const photosCell = photoRow.getCell(1);
+    const colorRow = table.getRow(index * 3);
+    const textRow = table.getRow(index * 3 + 1);
+    const photoRow = table.getRow(index * 3 + 2);
+    const colorCell = colorRow.getCell(0);
+    const contentCell = textRow.getCell(0);
+    const photosCell = photoRow.getCell(0);
     const photos = photoRecords.filter((photo) => photo.entryKey === entryKey_(level.name, entry));
     const gravityColor = gravityColor_(entry.gravity);
 
-    colorCellTop.setWidth(16);
-    colorCellBottom.setWidth(16);
-    colorCellTop.setBackgroundColor(gravityColor);
-    colorCellBottom.setBackgroundColor(gravityColor);
-    contentCell.setWidth(500);
-    photosCell.setWidth(500);
+    colorCell.setWidth(516);
+    colorCell.setBackgroundColor(gravityColor);
+    colorCell.setPaddingTop(0);
+    colorCell.setPaddingBottom(0);
+    colorCell.setPaddingLeft(0);
+    colorCell.setPaddingRight(0);
+    colorRow.setMinimumHeight(10);
+    contentCell.setWidth(516);
+    photosCell.setWidth(516);
 
-    clearCell_(colorCellTop);
-    clearCell_(colorCellBottom);
     clearCell_(contentCell);
     clearCell_(photosCell);
 

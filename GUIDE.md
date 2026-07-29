@@ -20,12 +20,15 @@ Ce dossier contient une premiere version complete de l'application mobile et du 
 - Gravite : Faible, Moyenne, Forte, Critique.
 - Photos depuis l'appareil photo ou la galerie.
 - Compression des photos avant envoi.
-- Recapitulatif avant envoi.
+- Deux parcours : envoi au secretariat pour complement ou generation directe du rapport.
+- Recapitulatif adapte au parcours choisi.
+- Avertissement avant generation directe lorsque des rubriques principales sont vides.
+- Sauvegarde automatique du brouillon sur l'appareil.
 - Envoi vers Google Apps Script.
 - Enregistrement dans Google Sheets.
 - Stockage des photos dans Google Drive.
 - Envoi d'un mail court a `secretariat2.lisec@gmail.com` et `monasspref@gmail.com`.
-- Rapport Word joint au mail.
+- Rapport Word joint au mail uniquement pour le parcours de generation directe.
 - Liens Drive des photos conserves dans Google Sheets et dans le mail.
 
 ## 2. Fichiers

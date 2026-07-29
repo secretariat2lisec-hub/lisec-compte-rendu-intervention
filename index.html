@@ -469,6 +469,21 @@
       white-space: pre-wrap;
     }
 
+    .review-notice {
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      border-left: 5px solid var(--brand);
+      background: #eeedf6;
+      color: var(--brand-strong);
+      font-weight: 700;
+    }
+
+    .review-notice.warning {
+      border-left-color: #d89a00;
+      background: #fff7dc;
+      color: #654900;
+    }
+
     @media (max-width: 720px) {
       .app {
         padding: 12px;
@@ -686,26 +701,27 @@
       <div class="status" id="status"></div>
 
       <div class="form-actions">
-        <button type="button" id="reviewBtn">Voir le récapitulatif</button>
-        <button class="secondary" type="button" id="saveBtn">Sauvegarder sur cet appareil</button>
+        <button type="button" id="completionBtn">Envoyer pour complément</button>
+        <button class="secondary" type="button" id="generateReportBtn">Générer le rapport</button>
       </div>
     </form>
   </main>
 
   <div class="review" id="review">
     <div class="review-panel">
-      <h2>Récapitulatif avant envoi</h2>
+      <h2 id="reviewTitle">Récapitulatif</h2>
+      <div class="review-notice" id="reviewNotice"></div>
       <div class="review-content" id="reviewContent"></div>
       <div class="actions" style="margin-top: 16px;">
-        <button type="button" id="sendBtn">Envoyer</button>
+        <button type="button" id="confirmActionBtn">Confirmer</button>
         <button class="secondary" type="button" id="closeReviewBtn">Modifier</button>
       </div>
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-29-2"></script>
+  <script src="data.js?v=2026-07-29-3"></script>
   <script>
-    const APP_VERSION = "2026-07-29-2";
+    const APP_VERSION = "2026-07-29-3";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.82;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
@@ -715,8 +731,11 @@
     const state = {
       levels: [],
       photoId: 1,
-      sitePhoto: null
+      sitePhoto: null,
+      pendingAction: null
     };
+
+    let autoSaveTimer = null;
 
     const $ = (selector, root = document) => root.querySelector(selector);
     const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -746,12 +765,15 @@
           setStatus(`Niveau ${name} ajouté.`, false, true);
       });
 
-      $("#reviewBtn").addEventListener("click", openReview);
+      $("#completionBtn").addEventListener("click", () => openReview("completion"));
+      $("#generateReportBtn").addEventListener("click", () => openReview("report"));
       $("#closeReviewBtn").addEventListener("click", () => $("#review").classList.remove("open"));
-      $("#sendBtn").addEventListener("click", sendReport);
-      $("#saveBtn").addEventListener("click", saveDraft);
+      $("#confirmActionBtn").addEventListener("click", submitWorkflow);
       $("#siteCameraPhoto").addEventListener("change", handleSitePhotoSelection);
       $("#siteGalleryPhoto").addEventListener("change", handleSitePhotoSelection);
+      $("#reportForm").addEventListener("input", scheduleAutoSave);
+      $("#reportForm").addEventListener("change", scheduleAutoSave);
+      window.addEventListener("beforeunload", () => saveDraft(false));
     }
 
     function addLevel(name, withFirstEntry = false, isDefault = false) {
@@ -764,6 +786,7 @@
       state.levels.push(level);
       renderLevels();
       if (withFirstEntry) addEntry(level.id);
+      scheduleAutoSave();
     }
 
     function addEntry(levelId) {
@@ -777,6 +800,7 @@
         photos: []
       });
       renderLevels();
+      scheduleAutoSave();
     }
 
     function removeEntry(levelId, entryId) {
@@ -784,11 +808,13 @@
       if (!level) return;
       level.entries = level.entries.filter((entry) => entry.id !== entryId);
       renderLevels();
+      scheduleAutoSave();
     }
 
     function removeLevel(levelId) {
       state.levels = state.levels.filter((level) => level.id !== levelId);
       renderLevels();
+      scheduleAutoSave();
     }
 
     function renderLevels() {
@@ -894,6 +920,7 @@
       }
       renderLevels();
       setStatus("Photos ajoutées.", false, true);
+      scheduleAutoSave();
     }
 
     async function handleSitePhotoSelection(event) {
@@ -912,6 +939,7 @@
         };
         renderSitePhoto();
         setStatus("Photo du lieu ajoutée.", false, true);
+        scheduleAutoSave();
       } catch (error) {
         setStatus(`Photo ignorée : ${file.name}`, true);
       }
@@ -933,6 +961,7 @@
       removeButton.addEventListener("click", () => {
         state.sitePhoto = null;
         renderSitePhoto();
+        scheduleAutoSave();
       });
       preview.append(image, removeButton);
     }
@@ -974,7 +1003,7 @@
       });
     }
 
-    function collectPayload() {
+    function collectPayload(workflowAction = "") {
       const presentPeopleEntries = [1, 2, 3, 4]
         .map((index) => $(`#presentPerson${index}`).value.trim());
       const constructionItems = [1, 2, 3, 4, 5, 6]
@@ -983,6 +1012,7 @@
         .map((index) => $(`#diffusion${index}`).value.trim());
       const payload = {
         submittedAt: new Date().toISOString(),
+        workflowAction,
         company: "LISEC",
         visitDate: $("#visitDate").value,
         visitTime: $("#visitTime").value,
@@ -1018,10 +1048,28 @@
       return payload;
     }
 
-    function openReview() {
-      const payload = collectPayload();
+    function openReview(action) {
+      state.pendingAction = action;
+      const payload = collectPayload(action);
       const photoCount = payload.levels.reduce((total, level) => total + level.entries.reduce((sum, entry) => sum + entry.photos.length, 0), 0);
       const filledEntries = payload.levels.reduce((total, level) => total + level.entries.length, 0);
+      const missingFields = getMissingReportFields(payload);
+      const isCompletion = action === "completion";
+
+      $("#reviewTitle").textContent = isCompletion
+        ? "Récapitulatif avant envoi pour complément"
+        : "Récapitulatif avant génération";
+      $("#reviewNotice").textContent = isCompletion
+        ? "Le secrétariat recevra ce dossier pour le compléter avant la génération du rapport."
+        : missingFields.length
+          ? `${missingFields.length} rubrique(s) sont encore vides. Le rapport peut tout de même être généré.`
+          : "Le dossier contient toutes les rubriques principales et peut être généré.";
+      $("#reviewNotice").classList.toggle("warning", !isCompletion && missingFields.length > 0);
+      $("#confirmActionBtn").textContent = isCompletion
+        ? "Envoyer pour complément"
+        : missingFields.length
+          ? "Générer malgré les champs vides"
+          : "Générer le rapport";
 
       $("#reviewContent").innerHTML = `
         <div class="review-block">
@@ -1080,6 +1128,25 @@
       $("#review").classList.add("open");
     }
 
+    function getMissingReportFields(payload) {
+      const checks = [
+        ["Ingénieur", payload.engineer],
+        ["Adresse", payload.siteAddress],
+        ["Code postal", payload.postalCode],
+        ["Ville", payload.city],
+        ["Photo du lieu", payload.sitePhoto],
+        ["Client", payload.clientBlock],
+        ["Mission", payload.mission],
+        ["Personnes présentes", payload.presentPeople],
+        ["Description", payload.workDescription],
+        ["Construction", payload.constructionItems.some(Boolean)],
+        ["Conclusion", payload.conclusion],
+        ["Préconisation", payload.recommendation],
+        ["Diffusion", payload.diffusion]
+      ];
+      return checks.filter(([, value]) => !value).map(([label]) => label);
+    }
+
     function renderLevelReview(level) {
       if (!level.entries.length) return `<p><strong>${escapeHtml(level.name)} :</strong> aucune localisation.</p>`;
       return `
@@ -1095,16 +1162,17 @@
       `;
     }
 
-    async function sendReport() {
+    async function submitWorkflow() {
+      const action = state.pendingAction || "completion";
       const scriptUrl = GOOGLE_APPS_SCRIPT_URL.trim();
       if (!scriptUrl) {
-        setStatus("Application pas encore connectee a Google. Il faut ajouter l'adresse Apps Script dans le code avant le vrai envoi.", true);
+        setStatus("Application pas encore connectée à Google. Il faut ajouter l'adresse Apps Script dans le code avant le vrai envoi.", true);
         return;
       }
 
-      const payload = collectPayload();
-      $("#sendBtn").disabled = true;
-      setStatus("Envoi en cours...");
+      const payload = collectPayload(action);
+      $("#confirmActionBtn").disabled = true;
+      setStatus(action === "completion" ? "Envoi au secrétariat en cours..." : "Génération du rapport en cours...");
 
       try {
         const response = await fetch(scriptUrl, {
@@ -1117,20 +1185,31 @@
         const result = await response.json();
         if (!result.ok) throw new Error(result.error || "Erreur inconnue");
 
-        setStatus("Compte rendu envoyé. Rapport et photos enregistrés.", false, true);
+        setStatus(
+          action === "completion"
+            ? "Dossier envoyé au secrétariat pour complément."
+            : "Rapport généré et envoyé avec les photos.",
+          false,
+          true
+        );
         $("#review").classList.remove("open");
         localStorage.removeItem(STORAGE_KEY);
       } catch (error) {
         setStatus(`Envoi impossible : ${error.message}`, true);
       } finally {
-        $("#sendBtn").disabled = false;
+        $("#confirmActionBtn").disabled = false;
       }
     }
 
-    function saveDraft() {
+    function scheduleAutoSave() {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => saveDraft(false), 500);
+    }
+
+    function saveDraft(showConfirmation = false) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(collectPayload()));
-        setStatus("Brouillon sauvegardé sur cet appareil.", false, true);
+        if (showConfirmation) setStatus("Brouillon sauvegardé sur cet appareil.", false, true);
       } catch (error) {
         setStatus("Le brouillon est trop volumineux pour être sauvegardé sur cet appareil.", true);
       }

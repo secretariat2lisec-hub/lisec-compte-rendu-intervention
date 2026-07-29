@@ -22,6 +22,7 @@ function doGet() {
 }
 
 function handleSubmission(payload) {
+  const workflowAction = payload.workflowAction === "completion" ? "completion" : "report";
   const interventionId = makeInterventionId(payload);
   const rootFolder = getOrCreateFolder_(CONFIG.driveRootFolderName);
   const interventionFolder = getOrCreateSubFolder_(rootFolder, interventionId);
@@ -33,6 +34,18 @@ function handleSubmission(payload) {
   writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords);
   writeInterventionSheet_(spreadsheet, payload, interventionId, photoRecords);
 
+  if (workflowAction === "completion") {
+    sendCompletionEmail_(payload, interventionId, interventionFolder, spreadsheet, photoRecords);
+    return {
+      interventionId,
+      workflowAction,
+      spreadsheetUrl: spreadsheet.getUrl(),
+      folderUrl: interventionFolder.getUrl(),
+      reportUrl: "",
+      photoCount: photoRecords.length
+    };
+  }
+
   const reportFile = createReport_(payload, interventionId, interventionFolder, photoRecords);
   const docxBlob = exportGoogleDocAsDocx_(reportFile.getId(), interventionId + ".docx");
 
@@ -40,6 +53,7 @@ function handleSubmission(payload) {
 
   return {
     interventionId,
+    workflowAction,
     spreadsheetUrl: spreadsheet.getUrl(),
     reportUrl: reportFile.getUrl(),
     photoCount: photoRecords.length
@@ -168,6 +182,7 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
   const sheet = spreadsheet.insertSheet(sheetName);
 
   sheet.appendRow(["Compte rendu LISEC", interventionId]);
+  sheet.appendRow(["Traitement demande", payload.workflowAction === "completion" ? "A completer par le secretariat" : "Generer le rapport"]);
   sheet.appendRow(["Date de visite", payload.visitDate || ""]);
   sheet.appendRow(["Heure de visite", payload.visitTime || ""]);
   sheet.appendRow(["Ingenieur", payload.engineer || ""]);
@@ -571,6 +586,50 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
     body,
     attachments
   });
+}
+
+function sendCompletionEmail_(payload, interventionId, interventionFolder, spreadsheet, photoRecords) {
+  const subject = `[A COMPLETER] LISEC - Intervention - ${payload.visitDate || interventionId}`;
+  const photoLinks = photoRecords.map((photo) => `- ${photo.levelName} / ${photo.localisation} : ${photo.url}`).join("\n");
+  const body = [
+    "Bonjour,",
+    "",
+    "Un compte rendu d'intervention LISEC a ete envoye pour complement.",
+    "Aucun rapport Word n'a encore ete genere.",
+    "",
+    `Date de visite : ${payload.visitDate || ""}`,
+    `Heure de visite : ${payload.visitTime || ""}`,
+    `Ingenieur : ${payload.engineer || ""}`,
+    `Client : ${clientText_(payload)}`,
+    `Lieu de la visite : ${fullSiteAddress_(payload)}`,
+    `Mission : ${payload.mission || ""}`,
+    "",
+    `Dossier Drive : ${interventionFolder.getUrl()}`,
+    `Tableau de suivi : ${spreadsheet.getUrl()}`,
+    "",
+    "Liens Drive des photos :",
+    photoLinks || "Aucune photo."
+  ].join("\n");
+
+  const attachments = [];
+  if (CONFIG.attachPhotosToEmail) {
+    let currentSize = 0;
+    photoRecords.forEach((photo) => {
+      const size = photo.blob.getBytes().length;
+      if (currentSize + size <= CONFIG.maxEmailAttachmentBytes) {
+        attachments.push(photo.blob.setName(photo.fileName));
+        currentSize += size;
+      }
+    });
+  }
+
+  const message = {
+    to: CONFIG.emailTo,
+    subject,
+    body
+  };
+  if (attachments.length) message.attachments = attachments;
+  MailApp.sendEmail(message);
 }
 
 function getOrCreateFolder_(name) {

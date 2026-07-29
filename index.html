@@ -719,9 +719,9 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-29-6"></script>
+  <script src="data.js?v=2026-07-29-7"></script>
   <script>
-    const APP_VERSION = "2026-07-29-6";
+    const APP_VERSION = "2026-07-29-7";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.72;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
@@ -1187,20 +1187,34 @@
           if (!result.ok) throw new Error(result.error || "Erreur inconnue");
         }
 
-        setStatus(
-          action === "completion"
-            ? "Dossier transmis au secrétariat. Son traitement peut prendre quelques instants."
-            : "Rapport transmis pour génération et envoi.",
-          false,
-          true
-        );
+        const successMessage = action === "completion"
+          ? "Dossier transmis au secrétariat. Un nouveau compte rendu peut être saisi."
+          : "Rapport transmis pour génération et envoi. Un nouveau compte rendu peut être saisi.";
         $("#review").classList.remove("open");
-        localStorage.removeItem(STORAGE_KEY);
+        resetFormAfterSubmission();
+        setStatus(successMessage, false, true);
       } catch (error) {
         setStatus(`Envoi impossible : ${error.message}`, true);
       } finally {
         $("#confirmActionBtn").disabled = false;
       }
+    }
+
+    function resetFormAfterSubmission() {
+      clearTimeout(autoSaveTimer);
+      $("#reportForm").reset();
+      state.levels = [];
+      state.sitePhoto = null;
+      state.pendingAction = null;
+      state.photoId = 1;
+      window.LISEC_DATA.niveaux.forEach((name) => addLevel(name, false, true));
+      clearTimeout(autoSaveTimer);
+      renderSitePhoto();
+      $("#visitDate").valueAsDate = new Date();
+      $("#visitTime").value = currentTimeValue();
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function scheduleAutoSave() {

@@ -236,21 +236,29 @@ function saveDossierState_(payload, interventionId, folder, photoRecords, status
 }
 
 function sanitizePayload_(payload, photos) {
-  const copy = JSON.parse(JSON.stringify(payload || {}));
+  const source = payload || {};
+  const copy = Object.assign({}, source);
   const sitePhoto = (photos || []).find((photo) => photo.isSitePhoto);
   copy.sitePhoto = sitePhoto ? photoForInterface_(sitePhoto) : null;
-  copy.presentPeopleEntries = Array.isArray(copy.presentPeopleEntries) ? copy.presentPeopleEntries.slice(0, 4) : [];
-  copy.constructionItems = Array.isArray(copy.constructionItems) ? copy.constructionItems.slice(0, 6) : [];
-  copy.diffusionEntries = Array.isArray(copy.diffusionEntries) ? copy.diffusionEntries.slice(0, 3) : [];
-
-  (copy.levels || []).forEach((level) => {
-    (level.entries || []).forEach((entry) => {
+  copy.presentPeopleEntries = Array.isArray(source.presentPeopleEntries) ? source.presentPeopleEntries.slice(0, 4) : [];
+  copy.constructionItems = Array.isArray(source.constructionItems) ? source.constructionItems.slice(0, 6) : [];
+  copy.diffusionEntries = Array.isArray(source.diffusionEntries) ? source.diffusionEntries.slice(0, 3) : [];
+  copy.levels = (source.levels || []).map((level) => ({
+    id: level.id || "",
+    name: level.name || "",
+    entries: (level.entries || []).map((entry) => {
       const key = entryKey_(level.name, entry);
-      entry.photos = (photos || [])
-        .filter((photo) => !photo.isSitePhoto && photo.entryKey === key)
-        .map(photoForInterface_);
-    });
-  });
+      return {
+        id: entry.id || "",
+        localisation: entry.localisation || "",
+        comment: entry.comment || "",
+        gravity: entry.gravity || "",
+        photos: (photos || [])
+          .filter((photo) => !photo.isSitePhoto && photo.entryKey === key)
+          .map(photoForInterface_)
+      };
+    })
+  }));
   return copy;
 }
 

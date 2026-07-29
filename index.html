@@ -719,11 +719,11 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-29-4"></script>
+  <script src="data.js?v=2026-07-29-5"></script>
   <script>
-    const APP_VERSION = "2026-07-29-4";
+    const APP_VERSION = "2026-07-29-5";
     const MAX_PHOTO_WIDTH = 1600;
-    const JPEG_QUALITY = 0.82;
+    const JPEG_QUALITY = 0.72;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
     const LEGACY_STORAGE_KEY = "lisec_intervention_draft_v1";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyKTUQ-SGyClnkjDfo2AuYZqTmpic8qjfiNn3aSdYUBbRPJLnj6mH3h-SjLKIvwjlki/exec";
@@ -1208,10 +1208,15 @@
 
     function saveDraft(showConfirmation = false) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(collectPayload()));
-        if (showConfirmation) setStatus("Brouillon sauvegardé sur cet appareil.", false, true);
+        const draft = collectPayload();
+        draft.sitePhoto = null;
+        draft.levels.forEach((level) => level.entries.forEach((entry) => entry.photos = []));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+        if (showConfirmation) {
+          setStatus("Textes sauvegardés sur cet appareil. Les photos restent disponibles tant que cette page reste ouverte.", false, true);
+        }
       } catch (error) {
-        setStatus("Le brouillon est trop volumineux pour être sauvegardé sur cet appareil.", true);
+        if (showConfirmation) setStatus("Impossible de sauvegarder le brouillon sur cet appareil.", true);
       }
     }
 
@@ -1241,7 +1246,7 @@
         [1, 2, 3, 4, 5, 6].forEach((index) => {
           $(`#construction${index}`).value = constructionItems[index - 1] || "";
         });
-        state.sitePhoto = draft.sitePhoto || null;
+        state.sitePhoto = draft.sitePhoto && draft.sitePhoto.dataUrl ? draft.sitePhoto : null;
         renderSitePhoto();
         $("#visitNote").value = draft.visitNote || "";
         $("#conclusion").value = draft.conclusion || "";
@@ -1262,7 +1267,7 @@
               localisation: entry.localisation || "",
               comment: entry.comment || "",
               gravity: entry.gravity || "",
-              photos: entry.photos || []
+              photos: (entry.photos || []).filter((photo) => photo && photo.dataUrl)
             }))
           }));
           renderLevels();

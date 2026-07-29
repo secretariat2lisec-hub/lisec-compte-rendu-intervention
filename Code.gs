@@ -26,6 +26,7 @@ function doPost(e) {
     const result = handleSubmission(payload);
     return jsonResponse({ ok: true, result });
   } catch (error) {
+    console.error(error && error.stack ? error.stack : error);
     return jsonResponse({ ok: false, error: String(error && error.message ? error.message : error) });
   }
 }
@@ -379,8 +380,11 @@ function makeInterventionId(payload) {
 
 function getOrCreateSpreadsheet_() {
   const files = DriveApp.getFilesByName(CONFIG.spreadsheetName);
-  if (files.hasNext()) {
-    return SpreadsheetApp.open(files.next());
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getMimeType() === MimeType.GOOGLE_SHEETS) {
+      return SpreadsheetApp.openById(file.getId());
+    }
   }
 
   const spreadsheet = SpreadsheetApp.create(CONFIG.spreadsheetName);

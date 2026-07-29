@@ -3,6 +3,7 @@ const CONFIG = {
   driveRootFolderName: "LISEC - Comptes rendus interventions",
   emailTo: "secretariat2.lisec@gmail.com,monasspref@gmail.com",
   templateDocId: "",
+  wordTemplateUrl: "https://raw.githubusercontent.com/secretariat2lisec-hub/lisec-compte-rendu-intervention/main/Masque-NOTE-TECHNIQUE-AUTOMATIQUE.docx",
   attachPhotosToEmail: true,
   maxEmailAttachmentBytes: 18 * 1024 * 1024
 };
@@ -96,8 +97,8 @@ function handleSubmission(payload) {
     };
   }
 
-  const reportFile = createReport_(payload, interventionId, interventionFolder, photoRecords);
-  const docxBlob = exportGoogleDocAsDocx_(reportFile.getId(), interventionId + ".docx");
+  const reportFile = createWordReport_(payload, interventionId, interventionFolder, photoRecords);
+  const docxBlob = reportFile.getBlob().setName(interventionId + ".docx");
 
   sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoRecords);
   dossier = saveDossierState_(
@@ -187,8 +188,8 @@ function generateReportForSecretariat(request) {
   const payload = dossier.payload || {};
   payload.workflowAction = "report";
   const photoRecords = loadPhotoRecords_(dossier.photos || []);
-  const reportFile = createReport_(payload, interventionId, folder, photoRecords);
-  const docxBlob = exportGoogleDocAsDocx_(reportFile.getId(), interventionId + ".docx");
+  const reportFile = createWordReport_(payload, interventionId, folder, photoRecords);
+  const docxBlob = reportFile.getBlob().setName(interventionId + ".docx");
   sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoRecords);
 
   dossier.payload = sanitizePayload_(payload, dossier.photos || []);
@@ -890,12 +891,13 @@ function exportGoogleDocAsDocx_(docId, fileName) {
 }
 
 function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoRecords) {
-  const subject = `LISEC - Compte rendu intervention - ${payload.visitDate || interventionId}`;
+  const subject = `[RAPPORT WORD] LISEC - ${interventionId}`;
   const photoLinks = photoRecords.map((photo) => `- ${photo.levelName} / ${photo.localisation} : ${photo.url}`).join("\n");
   const body = [
     "Bonjour,",
     "",
-    "Un nouveau compte rendu d'intervention LISEC a ete envoye.",
+    "Le compte rendu d'intervention LISEC a ete genere au format Word.",
+    `Dossier : ${interventionId}`,
     "",
     `Date de visite : ${payload.visitDate || ""}`,
     `Heure de visite : ${payload.visitTime || ""}`,
@@ -906,12 +908,10 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
     `Mission : ${payload.mission || ""}`,
     `Diffusion : ${diffusionText_(payload)}`,
     "",
-    `Rapport Google Docs : ${reportFile.getUrl()}`,
-    "",
     "Liens Drive des photos :",
     photoLinks || "Aucune photo.",
     "",
-    "Le rapport Word est joint a ce mail."
+    `Le fichier Word ${interventionId}.docx est joint a ce mail.`
   ].join("\n");
 
   const attachments = [docxBlob];
@@ -935,13 +935,14 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
 }
 
 function sendCompletionEmail_(payload, interventionId, interventionFolder, spreadsheet, photoRecords) {
-  const subject = `[A COMPLETER] LISEC - Intervention - ${payload.visitDate || interventionId}`;
+  const subject = `[A COMPLETER] LISEC - ${interventionId}`;
   const photoLinks = photoRecords.map((photo) => `- ${photo.levelName} / ${photo.localisation} : ${photo.url}`).join("\n");
   const body = [
     "Bonjour,",
     "",
     "Un compte rendu d'intervention LISEC a ete envoye pour complement.",
     "Aucun rapport Word n'a encore ete genere.",
+    `Dossier : ${interventionId}`,
     "",
     `Date de visite : ${payload.visitDate || ""}`,
     `Heure de visite : ${payload.visitTime || ""}`,

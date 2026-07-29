@@ -7,6 +7,19 @@ const CONFIG = {
   maxEmailAttachmentBytes: 18 * 1024 * 1024
 };
 
+const DOSSIER_FILE_NAME = "dossier.json";
+const DOSSIER_HEADERS = [
+  "ID intervention",
+  "Statut",
+  "Date visite",
+  "Client",
+  "Lieu",
+  "Ingenieur",
+  "Derniere modification",
+  "ID dossier Drive",
+  "Rapport"
+];
+
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents || "{}");
@@ -17,8 +30,15 @@ function doPost(e) {
   }
 }
 
-function doGet() {
-  return jsonResponse({ ok: true, message: "LISEC Apps Script pret a recevoir les comptes rendus." });
+function doGet(e) {
+  if (e && e.parameter && e.parameter.api === "status") {
+    return jsonResponse({ ok: true, message: "LISEC Apps Script pret a recevoir les comptes rendus." });
+  }
+
+  return HtmlService
+    .createHtmlOutputFromFile("Secretariat")
+    .setTitle("LISEC - Secretariat")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 function handleSubmission(payload) {
@@ -33,6 +53,16 @@ function handleSubmission(payload) {
 
   writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords);
   writeInterventionSheet_(spreadsheet, payload, interventionId, photoRecords);
+
+  let dossier = saveDossierState_(
+    payload,
+    interventionId,
+    interventionFolder,
+    photoRecords,
+    workflowAction === "completion" ? "A_COMPLETER" : "GENERATION_EN_COURS",
+    ""
+  );
+  upsertDossierIndex_(spreadsheet, dossier);
 
   if (workflowAction === "completion") {
     sendCompletionEmail_(payload, interventionId, interventionFolder, spreadsheet, photoRecords);
@@ -50,6 +80,15 @@ function handleSubmission(payload) {
   const docxBlob = exportGoogleDocAsDocx_(reportFile.getId(), interventionId + ".docx");
 
   sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoRecords);
+  dossier = saveDossierState_(
+    payload,
+    interventionId,
+    interventionFolder,
+    photoRecords,
+    "RAPPORT_GENERE",
+    reportFile.getUrl()
+  );
+  upsertDossierIndex_(spreadsheet, dossier);
 
   return {
     interventionId,
@@ -58,6 +97,277 @@ function handleSubmission(payload) {
     reportUrl: reportFile.getUrl(),
     photoCount: photoRecords.length
   };
+}
+
+function listInterventionsForSecretariat(request) {
+  assertSecretariatAccess_(request);
+  const spreadsheet = getOrCreateSpreadsheet_();
+  const sheet = ensureDossierIndexSheet_(spreadsheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+
+  return values.slice(1).map((row) => ({
+    interventionId: String(row[0] || ""),
+    status: String(row[1] || "A_COMPLETER"),
+    visitDate: formatSheetDate_(row[2]),
+    client: String(row[3] || ""),
+    location: String(row[4] || ""),
+    engineer: String(row[5] || ""),
+    updatedAt: formatSheetDateTime_(row[6]),
+    folderId: String(row[7] || ""),
+    reportUrl: String(row[8] || "")
+  })).filter((item) => item.interventionId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function getInterventionForSecretariat(request) {
+  assertSecretariatAccess_(request);
+  const interventionId = request && request.interventionId;
+  const folder = findDossierFolder_(interventionId);
+  const dossier = readDossierState_(folder);
+  if (!dossier) throw new Error("Dossier introuvable : " + interventionId);
+  return dossier;
+}
+
+function saveInterventionForSecretariat(request) {
+  assertSecretariatAccess_(request);
+  if (!request || !request.interventionId || !request.payload) {
+    throw new Error("Dossier incomplet.");
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const folder = findDossierFolder_(request.interventionId);
+    const existing = readDossierState_(folder);
+    if (!existing) throw new Error("Dossier introuvable : " + request.interventionId);
+
+    syncPhotoMetadata_(request.payload, existing.photos || []);
+    existing.payload = sanitizePayload_(request.payload, existing.photos || []);
+    existing.payload.workflowAction = "completion";
+    existing.status = "EN_REVISION";
+    existing.updatedAt = new Date().toISOString();
+    writeDossierState_(folder, existing);
+    upsertDossierIndex_(getOrCreateSpreadsheet_(), existing);
+    return existing;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function generateReportForSecretariat(request) {
+  assertSecretariatAccess_(request);
+  if (!request || !request.interventionId) throw new Error("Dossier non selectionne.");
+  if (request.payload) saveInterventionForSecretariat(request);
+
+  const interventionId = request.interventionId;
+  const folder = findDossierFolder_(interventionId);
+  const dossier = readDossierState_(folder);
+  if (!dossier) throw new Error("Dossier introuvable : " + interventionId);
+
+  const payload = dossier.payload || {};
+  payload.workflowAction = "report";
+  const photoRecords = loadPhotoRecords_(dossier.photos || []);
+  const reportFile = createReport_(payload, interventionId, folder, photoRecords);
+  const docxBlob = exportGoogleDocAsDocx_(reportFile.getId(), interventionId + ".docx");
+  sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoRecords);
+
+  dossier.payload = sanitizePayload_(payload, dossier.photos || []);
+  dossier.status = "RAPPORT_GENERE";
+  dossier.reportUrl = reportFile.getUrl();
+  dossier.updatedAt = new Date().toISOString();
+  dossier.generatedAt = dossier.updatedAt;
+  writeDossierState_(folder, dossier);
+  upsertDossierIndex_(getOrCreateSpreadsheet_(), dossier);
+
+  return {
+    interventionId,
+    status: dossier.status,
+    reportUrl: dossier.reportUrl,
+    updatedAt: dossier.updatedAt
+  };
+}
+
+function assertSecretariatAccess_(request) {
+  const expected = PropertiesService.getScriptProperties().getProperty("SECRETARIAT_ACCESS_CODE");
+  if (!expected) {
+    throw new Error("Le code d'acces du secretariat n'est pas encore configure dans les proprietes du script.");
+  }
+  if (!request || String(request.accessCode || "") !== String(expected)) {
+    throw new Error("Code d'acces incorrect.");
+  }
+}
+
+function syncPhotoMetadata_(payload, photos) {
+  (payload.levels || []).forEach((level) => {
+    (level.entries || []).forEach((entry) => {
+      const key = entryKey_(level.name, entry);
+      (photos || []).forEach((photo) => {
+        if (!photo.isSitePhoto && photo.entryKey === key) {
+          photo.levelName = level.name || "";
+          photo.localisation = entry.localisation || "";
+        }
+      });
+    });
+  });
+
+  const sitePhoto = (photos || []).find((photo) => photo.isSitePhoto);
+  if (sitePhoto) sitePhoto.localisation = fullSiteAddress_(payload);
+}
+
+function saveDossierState_(payload, interventionId, folder, photoRecords, status, reportUrl) {
+  const photos = photoRecordsMetadata_(photoRecords);
+  const dossier = {
+    interventionId,
+    status,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    folderId: folder.getId(),
+    folderUrl: folder.getUrl(),
+    reportUrl: reportUrl || "",
+    payload: sanitizePayload_(payload, photos),
+    photos
+  };
+
+  const previous = readDossierState_(folder);
+  if (previous && previous.createdAt) dossier.createdAt = previous.createdAt;
+  writeDossierState_(folder, dossier);
+  return dossier;
+}
+
+function sanitizePayload_(payload, photos) {
+  const copy = JSON.parse(JSON.stringify(payload || {}));
+  const sitePhoto = (photos || []).find((photo) => photo.isSitePhoto);
+  copy.sitePhoto = sitePhoto ? photoForInterface_(sitePhoto) : null;
+  copy.presentPeopleEntries = Array.isArray(copy.presentPeopleEntries) ? copy.presentPeopleEntries.slice(0, 4) : [];
+  copy.constructionItems = Array.isArray(copy.constructionItems) ? copy.constructionItems.slice(0, 6) : [];
+  copy.diffusionEntries = Array.isArray(copy.diffusionEntries) ? copy.diffusionEntries.slice(0, 3) : [];
+
+  (copy.levels || []).forEach((level) => {
+    (level.entries || []).forEach((entry) => {
+      const key = entryKey_(level.name, entry);
+      entry.photos = (photos || [])
+        .filter((photo) => !photo.isSitePhoto && photo.entryKey === key)
+        .map(photoForInterface_);
+    });
+  });
+  return copy;
+}
+
+function photoRecordsMetadata_(photoRecords) {
+  return (photoRecords || []).map((photo) => ({
+    levelName: photo.levelName || "",
+    localisation: photo.localisation || "",
+    entryKey: photo.entryKey || "",
+    isSitePhoto: Boolean(photo.isSitePhoto),
+    name: photo.name || photo.fileName || "photo.jpg",
+    fileName: photo.fileName || photo.name || "photo.jpg",
+    url: photo.url || "",
+    fileId: photo.fileId || "",
+    thumbnailUrl: photo.fileId ? `https://drive.google.com/thumbnail?id=${photo.fileId}&sz=w800` : ""
+  }));
+}
+
+function photoForInterface_(photo) {
+  return {
+    name: photo.name || photo.fileName || "photo.jpg",
+    url: photo.url || "",
+    fileId: photo.fileId || "",
+    thumbnailUrl: photo.thumbnailUrl || (photo.fileId ? `https://drive.google.com/thumbnail?id=${photo.fileId}&sz=w800` : "")
+  };
+}
+
+function loadPhotoRecords_(photos) {
+  return (photos || []).map((photo) => {
+    try {
+      const file = DriveApp.getFileById(photo.fileId);
+      return Object.assign({}, photo, { blob: file.getBlob() });
+    } catch (error) {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function writeDossierState_(folder, dossier) {
+  const content = JSON.stringify(dossier);
+  const files = folder.getFilesByName(DOSSIER_FILE_NAME);
+  if (files.hasNext()) {
+    files.next().setContent(content);
+  } else {
+    folder.createFile(DOSSIER_FILE_NAME, content, MimeType.PLAIN_TEXT);
+  }
+}
+
+function readDossierState_(folder) {
+  const files = folder.getFilesByName(DOSSIER_FILE_NAME);
+  if (!files.hasNext()) return null;
+  return JSON.parse(files.next().getBlob().getDataAsString("UTF-8"));
+}
+
+function findDossierFolder_(interventionId) {
+  const spreadsheet = getOrCreateSpreadsheet_();
+  const sheet = ensureDossierIndexSheet_(spreadsheet);
+  const values = sheet.getDataRange().getValues();
+  for (let row = 1; row < values.length; row++) {
+    if (String(values[row][0]) === String(interventionId) && values[row][7]) {
+      return DriveApp.getFolderById(String(values[row][7]));
+    }
+  }
+
+  const root = getOrCreateFolder_(CONFIG.driveRootFolderName);
+  const folders = root.getFoldersByName(interventionId);
+  if (folders.hasNext()) return folders.next();
+  throw new Error("Dossier Drive introuvable : " + interventionId);
+}
+
+function ensureDossierIndexSheet_(spreadsheet) {
+  return ensureSheet_(spreadsheet, "Dossiers", DOSSIER_HEADERS);
+}
+
+function upsertDossierIndex_(spreadsheet, dossier) {
+  const sheet = ensureDossierIndexSheet_(spreadsheet);
+  const values = sheet.getDataRange().getValues();
+  const payload = dossier.payload || {};
+  const rowValues = [[
+    dossier.interventionId,
+    dossier.status || "A_COMPLETER",
+    payload.visitDate || "",
+    clientText_(payload),
+    fullSiteAddress_(payload),
+    payload.engineer || "",
+    dossier.updatedAt || new Date().toISOString(),
+    dossier.folderId || "",
+    dossier.reportUrl || ""
+  ]];
+
+  let targetRow = 0;
+  for (let row = 1; row < values.length; row++) {
+    if (String(values[row][0]) === String(dossier.interventionId)) {
+      targetRow = row + 1;
+      break;
+    }
+  }
+
+  if (targetRow) {
+    sheet.getRange(targetRow, 1, 1, DOSSIER_HEADERS.length).setValues(rowValues);
+  } else {
+    sheet.appendRow(rowValues[0]);
+  }
+}
+
+function formatSheetDate_(value) {
+  if (!value) return "";
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  return String(value);
+}
+
+function formatSheetDateTime_(value) {
+  if (!value) return "";
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
+  }
+  return String(value);
 }
 
 function makeInterventionId(payload) {
@@ -115,6 +425,9 @@ function setupDatabaseSheets_(spreadsheet) {
     "Nom photo",
     "Lien Drive"
   ]);
+
+  const dossiers = spreadsheet.insertSheet("Dossiers");
+  dossiers.appendRow(DOSSIER_HEADERS);
 }
 
 function ensureSheet_(spreadsheet, name, headers) {

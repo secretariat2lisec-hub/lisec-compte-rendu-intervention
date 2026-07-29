@@ -38,6 +38,7 @@ Ce dossier contient une premiere version complete de l'application mobile et du 
 - `manifest.json` : installation sur l'ecran d'accueil.
 - `sw.js` : amelioration du comportement mobile.
 - `Code.gs` : code a coller dans Google Apps Script.
+- `Secretariat.html` : interface de controle a ajouter au projet Google Apps Script sous le nom `Secretariat`.
 
 ## 3. Organisation Google Sheets conseillee
 
@@ -48,7 +49,10 @@ Dans ce fichier, le script cree :
 - un onglet `Interventions` pour la liste generale,
 - un onglet `Observations` pour toutes les localisations,
 - un onglet `Photos` pour tous les liens Drive,
+- un onglet `Dossiers` pour la file de travail du secretariat,
 - un onglet par intervention pour avoir une lecture rapide du compte rendu.
+
+Chaque intervention possede egalement un fichier `dossier.json` dans son dossier Drive. Il conserve les champs modifiables et les references des photos sans recopier les images.
 
 Une feuille par niveau serait possible, mais ce serait moins pratique a filtrer et a maintenir quand il y aura beaucoup d'interventions.
 
@@ -83,25 +87,40 @@ Si ce champ reste vide, le script genere deja un rapport propre automatiquement.
 1. Aller sur https://script.google.com
 2. Creer un nouveau projet.
 3. Coller tout le contenu de `Code.gs`.
-4. Cliquer sur `Deploy` puis `New deployment`.
-5. Choisir `Web app`.
-6. Executer en tant que : vous.
-7. Acces : toute personne disposant du lien.
-8. Copier l'URL qui se termine par `/exec`.
-9. Ouvrir `index.html`.
-10. Rechercher cette ligne :
+4. Dans le projet Apps Script, ajouter un fichier HTML nomme `Secretariat`.
+5. Coller dans ce fichier tout le contenu de `Secretariat.html`.
+6. Ouvrir les parametres du projet puis les proprietes du script.
+7. Ajouter la propriete `SECRETARIAT_ACCESS_CODE` et choisir un code long reserve au secretariat.
+8. Cliquer sur `Deploy` puis `New deployment`.
+9. Choisir `Web app`.
+10. Executer en tant que : vous.
+11. Acces : toute personne disposant du lien, afin que l'application mobile puisse transmettre un dossier.
+12. Copier l'URL qui se termine par `/exec`.
+13. Ouvrir cette URL : elle affiche l'interface du secretariat et demande le code d'acces.
+14. Ajouter `?api=status` a l'URL pour verifier uniquement l'etat du service.
+La version fournie est deja reliee au deploiement Apps Script LISEC. Les etapes suivantes ne servent que si un nouveau deploiement cree une autre URL.
+
+15. Ouvrir `index.html`.
+16. Rechercher cette ligne :
 
 ```js
 const GOOGLE_APPS_SCRIPT_URL = "";
 ```
 
-11. Coller l'adresse entre les guillemets :
+17. Coller l'adresse entre les guillemets :
 
 ```js
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/XXXXXXXX/exec";
 ```
 
-L'adresse Google Apps Script ne doit pas etre visible pour les ingenieurs. Elle est configuree une fois dans le code avant la mise en ligne sur GitHub Pages.
+L'adresse Apps Script sera presente dans le code public de l'application. La confidentialite des dossiers repose donc sur le controle du code `SECRETARIAT_ACCESS_CODE`, jamais sur le secret de l'URL.
+
+Les fonctions de lecture, de modification et de generation refusent toute demande sans ce code. Le code est conserve uniquement en memoire dans la page du secretariat et doit etre ressaisi apres sa fermeture.
+
+Documentation officielle :
+
+- https://developers.google.com/apps-script/guides/web
+- https://developers.google.com/apps-script/guides/html/communication
 
 ## 6. Publication GitHub Pages
 

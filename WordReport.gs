@@ -36,8 +36,8 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
   if (payload.mission) {
     documentXml = insertAfterWordParagraph_(documentXml, "Objet", wordBodyParagraphXml_(payload.mission));
   }
-  if (diffusionText_(payload)) {
-    documentXml = insertAfterWordParagraph_(documentXml, "Diffusion", wordBodyParagraphXml_(diffusionText_(payload)));
+  if (diffusionForWord_(payload)) {
+    documentXml = insertAfterWordParagraph_(documentXml, "Diffusion", wordBodyParagraphXml_(diffusionForWord_(payload)));
   }
 
   const values = {
@@ -147,6 +147,13 @@ function presentPeopleForWord_(payload) {
     ? payload.presentPeopleEntries
     : String(payload.presentPeople || "").split(/\r?\n/);
   return people.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+}
+
+function diffusionForWord_(payload) {
+  const recipients = Array.isArray(payload.diffusionEntries)
+    ? payload.diffusionEntries
+    : String(payload.diffusion || "").split(/\r?\n/);
+  return recipients.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
 }
 
 function wordConstructionXml_(payload) {

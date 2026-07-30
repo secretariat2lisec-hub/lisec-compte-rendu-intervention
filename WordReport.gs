@@ -9,7 +9,9 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
   let parts = Utilities.unzip(response.getBlob().setName("masque-lisec.docx"));
   const documentPart = wordPart_(parts, "word/document.xml");
   const relationshipsPart = wordPart_(parts, "word/_rels/document.xml.rels");
+  const stylesPart = wordPart_(parts, "word/styles.xml");
   let documentXml = documentPart.getDataAsString("UTF-8");
+  let stylesXml = stylesPart.getDataAsString("UTF-8");
   const state = {
     parts,
     relationshipsXml: relationshipsPart.getDataAsString("UTF-8"),
@@ -32,6 +34,9 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
   documentXml = removeWordParagraphContaining_(documentXml, "{{CARTE_LOCALISATION}}");
   documentXml = removeWordParagraphContaining_(documentXml, "Ci-dessous une vue satellite");
   documentXml = removeWordParagraphContaining_(documentXml, "Vue satellite");
+  documentXml = replaceWordToken_(documentXml, "NOTE TECHNIQUE NT 1", payload.reportTitle || "");
+  documentXml = appendWordParagraphValue_(documentXml, "Référence LISEC", payload.lisecReference || "");
+  documentXml = insertBeforeWordParagraph_(documentXml, "Conclusion", wordPageBreakXml_());
 
   if (payload.mission) {
     documentXml = insertAfterWordParagraph_(documentXml, "Objet", wordBodyParagraphXml_(payload.mission));
@@ -43,7 +48,7 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
   const values = {
     "{{ADRESSE_SITE}}": payload.siteAddress || "",
     "{{CODE_POSTAL}}": payload.postalCode || "",
-    "{{VILLE}}": payload.city || "",
+    "{{VILLE}}": String(payload.city || "").toUpperCase(),
     "{{DATE_VISITE}}": payload.visitDate || "",
     "{{HEURE_VISITE}}": payload.visitTime || "",
     "{{PERSONNES_PRESENTES}}": presentPeopleForWord_(payload),
@@ -62,6 +67,8 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
     throw new Error("Champ Word non traite : " + remainingToken[0]);
   }
 
+  stylesXml = alignWordBodyStylesLeft_(stylesXml);
+
   state.parts = replaceWordPart_(state.parts, "word/document.xml", documentXml, "application/xml");
   state.parts = replaceWordPart_(
     state.parts,
@@ -69,6 +76,7 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
     state.relationshipsXml,
     "application/xml"
   );
+  state.parts = replaceWordPart_(state.parts, "word/styles.xml", stylesXml, "application/xml");
 
   const fileName = interventionId + ".docx";
   const docxBlob = Utilities.zip(state.parts, fileName)
@@ -110,6 +118,37 @@ function insertAfterWordParagraph_(xml, text, insertionXml) {
     inserted = true;
     return paragraphXml + insertionXml;
   });
+}
+
+function insertBeforeWordParagraph_(xml, text, insertionXml) {
+  let inserted = false;
+  return xml.replace(wordParagraphPattern_(text, "g"), (paragraphXml) => {
+    if (inserted) return paragraphXml;
+    inserted = true;
+    return insertionXml + paragraphXml;
+  });
+}
+
+function appendWordParagraphValue_(xml, label, value) {
+  if (!value) return xml;
+  let inserted = false;
+  return xml.replace(wordParagraphPattern_(label, "g"), (paragraphXml) => {
+    if (inserted) return paragraphXml;
+    inserted = true;
+    const valueRun = '<w:r><w:t xml:space="preserve"> ' + escapeWordXml_(value) + '</w:t></w:r>';
+    return paragraphXml.replace(/<\/w:p>$/, valueRun + "</w:p>");
+  });
+}
+
+function wordPageBreakXml_() {
+  return '<w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>';
+}
+
+function alignWordBodyStylesLeft_(stylesXml) {
+  return String(stylesXml || "").replace(
+    /<w:jc\b[^>]*w:val="(?:both|distribute|thaiDistribute)"[^>]*\/>/g,
+    '<w:jc w:val="left"/>'
+  );
 }
 
 function wordParagraphPattern_(text, flags) {
@@ -161,7 +200,7 @@ function wordConstructionXml_(payload) {
     ? payload.constructionItems
     : String(payload.construction || "").split(/\r?\n/);
   return items.map((item) => String(item || "").trim()).filter(Boolean).map((item) =>
-    '<w:p><w:pPr><w:spacing w:before="0" w:after="60"/><w:jc w:val="left"/></w:pPr>' +
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="60"/><w:ind w:left="1701"/><w:jc w:val="left"/></w:pPr>' +
     '<w:r><w:t xml:space="preserve">- ' + escapeWordXml_(item) + '</w:t></w:r></w:p>'
   ).join("");
 }
@@ -173,7 +212,7 @@ function wordBodyParagraphXml_(text) {
 }
 
 function wordSitePhotoXml_(state, photo) {
-  const image = registerWordImage_(state, photo.blob, 5472000, 4104000);
+  const image = registerWordImage_(state, photo.blob, 2736000, 2052000);
   const alt = "Vue generale de l'ouvrage";
   return wordImageParagraphXml_(image, alt) +
     '<w:p><w:pPr><w:spacing w:before="40" w:after="120"/><w:jc w:val="center"/></w:pPr>' +

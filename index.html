@@ -409,9 +409,21 @@
     }
 
     .status {
-      min-height: 28px;
+      display: none;
+      position: sticky;
+      top: 8px;
+      z-index: 6;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
       color: var(--muted);
       font-weight: 700;
+    }
+
+    .status:not(:empty) {
+      display: block;
     }
 
     .status.error {
@@ -538,7 +550,9 @@
       </div>
     </header>
 
-    <form id="reportForm">
+    <div class="status" id="status"></div>
+
+    <form id="reportForm" autocomplete="off">
       <section>
         <h2>Intervention</h2>
         <div class="grid">
@@ -597,6 +611,20 @@
         <div class="field">
           <label for="clientBlock">Nom et adresse complète du client</label>
           <textarea id="clientBlock" name="clientBlock"></textarea>
+        </div>
+      </section>
+
+      <section>
+        <h2>Rapport</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="lisecReference">Référence LISEC</label>
+            <input id="lisecReference" name="lisecReference" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="reportTitle">Titre</label>
+            <input id="reportTitle" name="reportTitle" type="text" autocomplete="off">
+          </div>
         </div>
       </section>
 
@@ -698,8 +726,6 @@
         </div>
       </section>
 
-      <div class="status" id="status"></div>
-
       <div class="form-actions">
         <button type="button" id="completionBtn">Envoyer pour complément</button>
         <button class="secondary" type="button" id="generateReportBtn">Générer le rapport</button>
@@ -719,9 +745,9 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-29-7"></script>
+  <script src="data.js?v=2026-07-30-8"></script>
   <script>
-    const APP_VERSION = "2026-07-29-7";
+    const APP_VERSION = "2026-07-30-8";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.72;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
@@ -742,13 +768,18 @@
 
     function init() {
       ensureFreshVersion();
+      clearStoredDraft();
       window.LISEC_DATA.niveaux.forEach((name) => addLevel(name, false, true));
       $("#visitDate").valueAsDate = new Date();
       $("#visitTime").value = currentTimeValue();
 
-      restoreDraft();
       bindEvents();
       registerServiceWorker();
+      const successMessage = sessionStorage.getItem("lisec_submission_success");
+      if (successMessage) {
+        sessionStorage.removeItem("lisec_submission_success");
+        setStatus(successMessage, false, true);
+      }
     }
 
     function bindEvents() {
@@ -771,9 +802,11 @@
       $("#confirmActionBtn").addEventListener("click", submitWorkflow);
       $("#siteCameraPhoto").addEventListener("change", handleSitePhotoSelection);
       $("#siteGalleryPhoto").addEventListener("change", handleSitePhotoSelection);
-      $("#reportForm").addEventListener("input", scheduleAutoSave);
-      $("#reportForm").addEventListener("change", scheduleAutoSave);
-      window.addEventListener("beforeunload", () => saveDraft(false));
+      window.addEventListener("pageshow", (event) => {
+        if (event.persisted) {
+          window.location.replace(`${window.location.pathname}?v=${APP_VERSION}&fresh=${Date.now()}`);
+        }
+      });
     }
 
     function addLevel(name, withFirstEntry = false, isDefault = false) {
@@ -1022,6 +1055,8 @@
         city: $("#city").value.trim(),
         sitePhoto: state.sitePhoto,
         clientBlock: $("#clientBlock").value.trim(),
+        lisecReference: $("#lisecReference").value.trim(),
+        reportTitle: $("#reportTitle").value.trim(),
         mission: $("#mission").value.trim(),
         presentPeopleEntries,
         presentPeople: presentPeopleEntries.filter(Boolean).join("\n"),
@@ -1088,6 +1123,11 @@
           <p>${escapeHtml(payload.clientBlock || "Non renseigné")}</p>
         </div>
         <div class="review-block">
+          <h3>Rapport</h3>
+          <p><strong>Référence LISEC :</strong> ${escapeHtml(payload.lisecReference || "Non renseignée")}</p>
+          <p><strong>Titre :</strong> ${escapeHtml(payload.reportTitle || "Non renseigné")}</p>
+        </div>
+        <div class="review-block">
           <h3>Mission</h3>
           <p>${escapeHtml(payload.mission || "Non renseignée")}</p>
         </div>
@@ -1136,6 +1176,8 @@
         ["Ville", payload.city],
         ["Photo du lieu", payload.sitePhoto],
         ["Client", payload.clientBlock],
+        ["Référence LISEC", payload.lisecReference],
+        ["Titre", payload.reportTitle],
         ["Mission", payload.mission],
         ["Personnes présentes", payload.presentPeople],
         ["Description", payload.workDescription],
@@ -1192,7 +1234,8 @@
           : "Rapport transmis pour génération et envoi. Un nouveau compte rendu peut être saisi.";
         $("#review").classList.remove("open");
         resetFormAfterSubmission();
-        setStatus(successMessage, false, true);
+        sessionStorage.setItem("lisec_submission_success", successMessage);
+        window.location.replace(`${window.location.pathname}?v=${APP_VERSION}&fresh=${Date.now()}`);
       } catch (error) {
         setStatus(`Envoi impossible : ${error.message}`, true);
       } finally {
@@ -1215,6 +1258,11 @@
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function clearStoredDraft() {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
 
     function scheduleAutoSave() {

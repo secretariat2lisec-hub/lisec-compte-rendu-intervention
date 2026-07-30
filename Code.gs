@@ -437,7 +437,9 @@ function setupDatabaseSheets_(spreadsheet) {
     "Mission",
     "Diffusion",
     "Rapport",
-    "Nombre photos"
+    "Nombre photos",
+    "Reference LISEC",
+    "Titre"
   ]);
 
   const observations = spreadsheet.insertSheet("Observations");
@@ -467,13 +469,17 @@ function ensureSheet_(spreadsheet, name, headers) {
   if (!sheet) {
     sheet = spreadsheet.insertSheet(name);
     sheet.appendRow(headers);
+  } else if (headers && sheet.getLastColumn() < headers.length) {
+    const firstMissingColumn = sheet.getLastColumn() + 1;
+    const missingHeaders = headers.slice(firstMissingColumn - 1);
+    sheet.getRange(1, firstMissingColumn, 1, missingHeaders.length).setValues([missingHeaders]);
   }
   return sheet;
 }
 
 function writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords) {
   const interventions = ensureSheet_(spreadsheet, "Interventions", [
-    "ID intervention", "Date reception", "Date visite", "Heure visite", "Ingenieur", "Client", "Adresse", "Code postal", "Ville", "Personnes presentes", "Mission", "Diffusion", "Rapport", "Nombre photos"
+    "ID intervention", "Date reception", "Date visite", "Heure visite", "Ingenieur", "Client", "Adresse", "Code postal", "Ville", "Personnes presentes", "Mission", "Diffusion", "Rapport", "Nombre photos", "Reference LISEC", "Titre"
   ]);
   const observations = ensureSheet_(spreadsheet, "Observations", [
     "ID intervention", "Niveau", "Localisation", "Gravite", "Commentaire"
@@ -496,7 +502,9 @@ function writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords
     payload.mission || "",
     diffusionText_(payload),
     "",
-    photoRecords.length
+    photoRecords.length,
+    payload.lisecReference || "",
+    payload.reportTitle || ""
   ]);
 
   (payload.levels || []).forEach((level) => {
@@ -532,6 +540,8 @@ function writeInterventionSheet_(spreadsheet, payload, interventionId, photoReco
   sheet.appendRow(["Heure de visite", payload.visitTime || ""]);
   sheet.appendRow(["Ingenieur", payload.engineer || ""]);
   sheet.appendRow(["Client", clientText_(payload)]);
+  sheet.appendRow(["Reference LISEC", payload.lisecReference || ""]);
+  sheet.appendRow(["Titre", payload.reportTitle || ""]);
   sheet.appendRow(["Adresse", payload.siteAddress || ""]);
   sheet.appendRow(["Code postal", payload.postalCode || ""]);
   sheet.appendRow(["Ville", payload.city || ""]);
@@ -654,7 +664,6 @@ function createReport_(payload, interventionId, interventionFolder, photoRecords
 function replacePlaceholders_(body, payload, interventionId) {
   const values = {
     "{{ID_INTERVENTION}}": interventionId,
-    "{{TITRE}}": "",
     "{{DATE_VISITE}}": payload.visitDate || "",
     "{{HEURE_VISITE}}": payload.visitTime || "",
     "{{INGENIEUR}}": payload.engineer || "",
@@ -662,8 +671,10 @@ function replacePlaceholders_(body, payload, interventionId) {
     "{{CLIENT}}": clientText_(payload),
     "{{ADRESSE_SITE}}": payload.siteAddress || "",
     "{{CODE_POSTAL}}": payload.postalCode || "",
-    "{{VILLE}}": payload.city || "",
+    "{{VILLE}}": String(payload.city || "").toUpperCase(),
     "{{MISSION}}": payload.mission || "",
+    "{{REFERENCE_LISEC}}": payload.lisecReference || "",
+    "{{TITRE}}": payload.reportTitle || "",
     "{{DIFFUSION}}": diffusionText_(payload),
     "{{PERSONNES_PRESENTES}}": presentPeopleText_(payload),
     "{{DESCRIPTION_OUVRAGE}}": payload.workDescription || "",
@@ -903,6 +914,8 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
     `Heure de visite : ${payload.visitTime || ""}`,
     `Ingenieur : ${payload.engineer || ""}`,
     `Client : ${clientText_(payload)}`,
+    `Reference LISEC : ${payload.lisecReference || ""}`,
+    `Titre : ${payload.reportTitle || ""}`,
     `Lieu de la visite : ${fullSiteAddress_(payload)}`,
     `Personnes presentes : ${presentPeopleText_(payload)}`,
     `Mission : ${payload.mission || ""}`,
@@ -948,6 +961,8 @@ function sendCompletionEmail_(payload, interventionId, interventionFolder, sprea
     `Heure de visite : ${payload.visitTime || ""}`,
     `Ingenieur : ${payload.engineer || ""}`,
     `Client : ${clientText_(payload)}`,
+    `Reference LISEC : ${payload.lisecReference || ""}`,
+    `Titre : ${payload.reportTitle || ""}`,
     `Lieu de la visite : ${fullSiteAddress_(payload)}`,
     `Mission : ${payload.mission || ""}`,
     "",

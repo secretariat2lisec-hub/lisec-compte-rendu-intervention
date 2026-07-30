@@ -1,7 +1,7 @@
 const CONFIG = {
   spreadsheetName: "LISEC - Comptes rendus interventions",
   driveRootFolderName: "LISEC - Comptes rendus interventions",
-  emailTo: "secretariat2.lisec@gmail.com,monasspref@gmail.com",
+  emailTo: "secretariat2.lisec@gmail.com",
   templateDocId: "",
   wordTemplateUrl: "https://raw.githubusercontent.com/secretariat2lisec-hub/lisec-compte-rendu-intervention/main/Masque-NOTE-TECHNIQUE-AUTOMATIQUE.docx",
   attachPhotosToEmail: true,
@@ -775,10 +775,10 @@ function appendLegendTable_(body) {
     ["", "Risque faible", "Long terme (moins de 5 ans)"],
     ["", "Risque moyen", "Moyen terme (moins de 2 ans)"],
     ["", "Risque important", "Court terme (moins de 6 mois)"],
-    ["", "Risque imminent", "En urgence (sans délai)"]
+    ["", "Risque critique", "En urgence (sans délai)"]
   ]);
 
-  const colors = ["#70AD47", "#FFC000", "#ED7D31", "#C00000"];
+  const colors = ["#4F8A3D", "#D6A000", "#E26B0A", "#B91C1C"];
   table.getRow(0).editAsText().setBold(true);
   table.getCell(0, 0).setWidth(90);
   table.getCell(0, 1).setWidth(190);
@@ -886,10 +886,10 @@ function styleTableText_(table, size, boldHeader) {
 
 function gravityColor_(gravity) {
   const value = String(gravity || "").toLowerCase();
-  if (value.indexOf("faible") !== -1) return "#70AD47";
-  if (value.indexOf("moyenne") !== -1 || value.indexOf("moyen") !== -1) return "#FFC000";
-  if (value.indexOf("forte") !== -1 || value.indexOf("important") !== -1) return "#ED7D31";
-  if (value.indexOf("critique") !== -1 || value.indexOf("imminent") !== -1) return "#C00000";
+  if (value.indexOf("faible") !== -1) return "#4F8A3D";
+  if (value.indexOf("moyenne") !== -1 || value.indexOf("moyen") !== -1) return "#D6A000";
+  if (value.indexOf("forte") !== -1 || value.indexOf("important") !== -1) return "#E26B0A";
+  if (value.indexOf("critique") !== -1 || value.indexOf("imminent") !== -1) return "#B91C1C";
   return "#D9EAD3";
 }
 

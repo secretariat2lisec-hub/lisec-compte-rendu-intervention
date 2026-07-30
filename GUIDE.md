@@ -17,7 +17,7 @@ Ce dossier contient une premiere version complete de l'application mobile et du 
 - Niveaux fixes : Facade, RDC, R+1, R+2, R+3.
 - Possibilite d'ajouter un niveau en plus.
 - Possibilite d'ajouter autant de localisations que necessaire par niveau.
-- Gravite : Faible, Moyenne, Forte, Critique.
+- Gravite : Faible, Moyen, Important, Critique.
 - Photos depuis l'appareil photo ou la galerie.
 - Compression des photos avant envoi.
 - Deux parcours : envoi au secretariat pour complement ou generation directe du rapport.
@@ -27,7 +27,7 @@ Ce dossier contient une premiere version complete de l'application mobile et du 
 - Envoi vers Google Apps Script.
 - Enregistrement dans Google Sheets.
 - Stockage des photos dans Google Drive.
-- Envoi d'un mail court a `secretariat2.lisec@gmail.com` et `monasspref@gmail.com`.
+- Envoi d'un mail court a `secretariat2.lisec@gmail.com`.
 - Rapport Word joint au mail uniquement pour le parcours de generation directe.
 - Liens Drive des photos conserves dans Google Sheets et dans le mail.
 

@@ -745,9 +745,9 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-30-8"></script>
+  <script src="data.js?v=2026-07-30-9"></script>
   <script>
-    const APP_VERSION = "2026-07-30-8";
+    const APP_VERSION = "2026-07-30-9";
     const MAX_PHOTO_WIDTH = 1600;
     const JPEG_QUALITY = 0.72;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
@@ -796,10 +796,10 @@
           setStatus(`Niveau ${name} ajouté.`, false, true);
       });
 
-      $("#completionBtn").addEventListener("click", () => openReview("completion"));
+      $("#completionBtn").addEventListener("click", () => submitWorkflow("completion"));
       $("#generateReportBtn").addEventListener("click", () => openReview("report"));
       $("#closeReviewBtn").addEventListener("click", () => $("#review").classList.remove("open"));
-      $("#confirmActionBtn").addEventListener("click", submitWorkflow);
+      $("#confirmActionBtn").addEventListener("click", () => submitWorkflow());
       $("#siteCameraPhoto").addEventListener("change", handleSitePhotoSelection);
       $("#siteGalleryPhoto").addEventListener("change", handleSitePhotoSelection);
       window.addEventListener("pageshow", (event) => {
@@ -1204,8 +1204,14 @@
       `;
     }
 
-    async function submitWorkflow() {
-      const action = state.pendingAction || "completion";
+    function setSubmissionBusy(isBusy) {
+      $("#completionBtn").disabled = isBusy;
+      $("#generateReportBtn").disabled = isBusy;
+      $("#confirmActionBtn").disabled = isBusy;
+    }
+
+    async function submitWorkflow(requestedAction = "") {
+      const action = requestedAction || state.pendingAction || "completion";
       const scriptUrl = GOOGLE_APPS_SCRIPT_URL.trim();
       if (!scriptUrl) {
         setStatus("Application pas encore connectée à Google. Il faut ajouter l'adresse Apps Script dans le code avant le vrai envoi.", true);
@@ -1213,7 +1219,7 @@
       }
 
       const payload = collectPayload(action);
-      $("#confirmActionBtn").disabled = true;
+      setSubmissionBusy(true);
       setStatus(action === "completion" ? "Envoi au secrétariat en cours..." : "Génération du rapport en cours...");
 
       try {
@@ -1239,7 +1245,7 @@
       } catch (error) {
         setStatus(`Envoi impossible : ${error.message}`, true);
       } finally {
-        $("#confirmActionBtn").disabled = false;
+        setSubmissionBusy(false);
       }
     }
 

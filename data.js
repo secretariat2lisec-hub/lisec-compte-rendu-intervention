@@ -1,8 +1,8 @@
 window.LISEC_DATA = {
   gravites: [
     "Faible",
-    "Moyenne",
-    "Forte",
+    "Moyen",
+    "Important",
     "Critique"
   ],
   niveaux: [

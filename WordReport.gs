@@ -260,10 +260,10 @@ function wordGravityLineXml_(gravity) {
 
 function wordGravityColor_(gravity) {
   const value = String(gravity || "").toLowerCase();
-  if (value.indexOf("faible") !== -1) return "70AD47";
-  if (value.indexOf("moyenne") !== -1 || value.indexOf("moyen") !== -1) return "FFC000";
-  if (value.indexOf("forte") !== -1 || value.indexOf("important") !== -1) return "ED7D31";
-  if (value.indexOf("critique") !== -1 || value.indexOf("imminent") !== -1) return "C00000";
+  if (value.indexOf("faible") !== -1) return "4F8A3D";
+  if (value.indexOf("moyenne") !== -1 || value.indexOf("moyen") !== -1) return "D6A000";
+  if (value.indexOf("forte") !== -1 || value.indexOf("important") !== -1) return "E26B0A";
+  if (value.indexOf("critique") !== -1 || value.indexOf("imminent") !== -1) return "B91C1C";
   return "BFBFBF";
 }
 

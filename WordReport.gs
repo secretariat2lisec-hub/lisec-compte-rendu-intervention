@@ -82,6 +82,8 @@ function createWordReport_(payload, interventionId, interventionFolder, photoRec
   const docxBlob = Utilities.zip(state.parts, fileName)
     .setContentType(WORD_MIME_TYPE)
     .setName(fileName);
+  const previousFiles = interventionFolder.getFilesByName(fileName);
+  while (previousFiles.hasNext()) previousFiles.next().setTrashed(true);
   return interventionFolder.createFile(docxBlob);
 }
 

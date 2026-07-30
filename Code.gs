@@ -4,8 +4,8 @@ const CONFIG = {
   emailTo: "secretariat2.lisec@gmail.com",
   templateDocId: "",
   wordTemplateUrl: "https://raw.githubusercontent.com/secretariat2lisec-hub/lisec-compte-rendu-intervention/main/Masque-NOTE-TECHNIQUE-AUTOMATIQUE.docx",
-  attachPhotosToEmail: true,
-  maxEmailAttachmentBytes: 18 * 1024 * 1024
+  uploadRootFolderName: "_Transferts photos en cours",
+  uploadManifestFileName: "upload-manifest.json"
 };
 
 const DOSSIER_FILE_NAME = "dossier.json";
@@ -23,19 +23,29 @@ const DOSSIER_HEADERS = [
 
 function doPost(e) {
   const properties = PropertiesService.getScriptProperties();
+  let payload = {};
   try {
-    const payload = JSON.parse(e.postData.contents || "{}");
-    const result = handleSubmission(payload);
+    payload = JSON.parse(e.postData.contents || "{}");
+    let result;
+    if (payload.requestType === "photo-batch") {
+      result = handlePhotoBatch_(payload);
+    } else if (payload.requestType === "discard-photo-upload") {
+      result = discardPhotoUpload_(payload.photoUploadSessionId);
+    } else {
+      result = handleSubmission(payload);
+    }
     properties.setProperty("LAST_SUBMISSION_DIAGNOSTIC", JSON.stringify({
       ok: true,
       at: new Date().toISOString(),
       interventionId: result.interventionId || "",
-      workflowAction: result.workflowAction || ""
+      workflowAction: result.workflowAction || "",
+      requestType: payload.requestType || "submission"
     }));
     return jsonResponse({ ok: true, result });
   } catch (error) {
     const detail = String(error && error.stack ? error.stack : error);
     console.error(detail);
+    markTransferError_(payload.photoUploadSessionId, detail);
     properties.setProperty("LAST_SUBMISSION_DIAGNOSTIC", JSON.stringify({
       ok: false,
       at: new Date().toISOString(),
@@ -46,6 +56,11 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  if (e && e.parameter && e.parameter.api === "transfer-status") {
+    const status = getTransferStatus_(e.parameter.photoUploadSessionId || "");
+    return javascriptResponse_(e.parameter.callback || "", status);
+  }
+
   if (e && e.parameter && e.parameter.api === "last-submission") {
     assertSecretariatAccess_({ accessCode: e.parameter.accessCode || "" });
     const raw = PropertiesService.getScriptProperties().getProperty("LAST_SUBMISSION_DIAGNOSTIC");
@@ -69,7 +84,14 @@ function handleSubmission(payload) {
   const interventionFolder = getOrCreateSubFolder_(rootFolder, interventionId);
   const photoFolder = getOrCreateSubFolder_(interventionFolder, "Photos");
 
-  const photoRecords = savePhotos_(payload, interventionId, photoFolder);
+  const photoRecords = payload.photoUploadSessionId
+    ? adoptUploadedPhotos_(payload, photoFolder)
+    : savePhotos_(payload, interventionId, photoFolder);
+  const expectedPhotoCount = Number(payload.photoCount || 0);
+  if (payload.photoUploadSessionId && photoRecords.length !== expectedPhotoCount) {
+    throw new Error("Transfert photo incomplet : " + photoRecords.length + " photo(s) reçue(s) sur " + expectedPhotoCount + ".");
+  }
+  syncPhotoMetadata_(payload, photoRecords);
   const spreadsheet = getOrCreateSpreadsheet_();
 
   writeDatabaseSheets_(spreadsheet, payload, interventionId, photoRecords);
@@ -87,7 +109,7 @@ function handleSubmission(payload) {
 
   if (workflowAction === "completion") {
     sendCompletionEmail_(payload, interventionId, interventionFolder, spreadsheet, photoRecords);
-    return {
+    const result = {
       interventionId,
       workflowAction,
       spreadsheetUrl: spreadsheet.getUrl(),
@@ -95,6 +117,8 @@ function handleSubmission(payload) {
       reportUrl: "",
       photoCount: photoRecords.length
     };
+    markTransferFinalized_(payload.photoUploadSessionId, result);
+    return result;
   }
 
   const reportFile = createWordReport_(payload, interventionId, interventionFolder, photoRecords);
@@ -111,13 +135,16 @@ function handleSubmission(payload) {
   );
   upsertDossierIndex_(spreadsheet, dossier);
 
-  return {
+  const result = {
     interventionId,
     workflowAction,
     spreadsheetUrl: spreadsheet.getUrl(),
+    folderUrl: interventionFolder.getUrl(),
     reportUrl: reportFile.getUrl(),
     photoCount: photoRecords.length
   };
+  markTransferFinalized_(payload.photoUploadSessionId, result);
+  return result;
 }
 
 function listInterventionsForSecretariat(request) {
@@ -400,6 +427,8 @@ function formatSheetDateTime_(value) {
 }
 
 function makeInterventionId(payload) {
+  const supplied = cleanName_(payload.interventionId || "").substring(0, 120);
+  if (supplied) return supplied;
   const datePart = payload.visitDate || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   const timePart = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HHmmss");
   const engineer = cleanName_(payload.engineer || "ingenieur");
@@ -633,6 +662,220 @@ function savePhotos_(payload, interventionId, photoFolder) {
     });
   });
   return records;
+}
+
+function handlePhotoBatch_(payload) {
+  const sessionId = normalizeUploadIdentifier_(payload.photoUploadSessionId, "session de transfert");
+  const batchId = normalizeUploadIdentifier_(payload.batchId, "lot de photos");
+  const photos = Array.isArray(payload.photos) ? payload.photos : [];
+  const folder = getTransferFolder_(sessionId, true);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const manifest = readTransferManifest_(folder, sessionId);
+    if (manifest.receivedBatchIds.indexOf(batchId) !== -1) {
+      return transferStatusFromManifest_(manifest, true);
+    }
+
+    photos.forEach((photo, index) => {
+      const uploadKey = normalizeUploadIdentifier_(photo.uploadKey || (batchId + "-" + index), "photo");
+      if (manifest.photos.some((item) => item.uploadKey === uploadKey)) return;
+      if (!photo.dataUrl) throw new Error("Données absentes pour la photo " + uploadKey + ".");
+
+      const blob = photoBlobFromDataUrl_(photo.dataUrl);
+      const fileName = transferPhotoFileName_(photo, uploadKey, index);
+      const file = folder.createFile(blob.setName(fileName));
+      manifest.photos.push({
+        uploadKey,
+        batchId,
+        levelName: photo.levelName || "",
+        localisation: photo.localisation || "",
+        entryKey: photo.entryId || photo.entryKey || "",
+        isSitePhoto: Boolean(photo.isSitePhoto),
+        name: photo.name || fileName,
+        fileName,
+        fileId: file.getId(),
+        url: file.getUrl()
+      });
+      manifest.updatedAt = new Date().toISOString();
+      manifest.error = "";
+      writeTransferManifest_(folder, manifest);
+    });
+
+    manifest.receivedBatchIds.push(batchId);
+    manifest.expectedPhotoCount = Number(payload.expectedPhotoCount || manifest.expectedPhotoCount || 0);
+    manifest.updatedAt = new Date().toISOString();
+    manifest.error = "";
+    writeTransferManifest_(folder, manifest);
+    if (payload.isFirstBatch) cleanupOldTransfers_(sessionId);
+    return transferStatusFromManifest_(manifest, true);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function adoptUploadedPhotos_(payload, photoFolder) {
+  const sessionId = normalizeUploadIdentifier_(payload.photoUploadSessionId, "session de transfert");
+  const folder = getTransferFolder_(sessionId, false);
+  if (!folder) throw new Error("Le transfert des photos est introuvable.");
+  const manifest = readTransferManifest_(folder, sessionId);
+  if (manifest.error) {
+    manifest.error = "";
+    manifest.updatedAt = new Date().toISOString();
+    writeTransferManifest_(folder, manifest);
+  }
+
+  return (manifest.photos || []).map((photo) => {
+    const file = DriveApp.getFileById(photo.fileId);
+    file.moveTo(photoFolder);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const fileName = photo.fileName || photo.name || "photo.jpg";
+    return Object.assign({}, photo, {
+      fileName,
+      url: file.getUrl(),
+      fileId: file.getId(),
+      blob: file.getBlob().setName(fileName)
+    });
+  });
+}
+
+function getTransferStatus_(sessionId) {
+  try {
+    const normalized = normalizeUploadIdentifier_(sessionId, "session de transfert");
+    const folder = getTransferFolder_(normalized, false);
+    if (!folder) return { ok: true, found: false, photoCount: 0, receivedBatchIds: [], finalized: false, error: "" };
+    return transferStatusFromManifest_(readTransferManifest_(folder, normalized), true);
+  } catch (error) {
+    return { ok: false, found: false, photoCount: 0, receivedBatchIds: [], finalized: false, error: String(error.message || error) };
+  }
+}
+
+function markTransferFinalized_(sessionId, result) {
+  if (!sessionId) return;
+  const normalized = normalizeUploadIdentifier_(sessionId, "session de transfert");
+  const folder = getTransferFolder_(normalized, false);
+  if (!folder) return;
+  const manifest = readTransferManifest_(folder, normalized);
+  manifest.finalized = true;
+  manifest.error = "";
+  manifest.interventionId = result.interventionId || "";
+  manifest.workflowAction = result.workflowAction || "";
+  manifest.folderUrl = result.folderUrl || "";
+  manifest.reportUrl = result.reportUrl || "";
+  manifest.updatedAt = new Date().toISOString();
+  writeTransferManifest_(folder, manifest);
+}
+
+function markTransferError_(sessionId, detail) {
+  if (!sessionId) return;
+  try {
+    const normalized = normalizeUploadIdentifier_(sessionId, "session de transfert");
+    const folder = getTransferFolder_(normalized, false);
+    if (!folder) return;
+    const manifest = readTransferManifest_(folder, normalized);
+    if (manifest.finalized) return;
+    manifest.error = String(detail || "Erreur de transfert").substring(0, 2000);
+    manifest.updatedAt = new Date().toISOString();
+    writeTransferManifest_(folder, manifest);
+  } catch (ignored) {
+    console.error(String(ignored));
+  }
+}
+
+function discardPhotoUpload_(sessionId) {
+  const normalized = normalizeUploadIdentifier_(sessionId, "session de transfert");
+  const folder = getTransferFolder_(normalized, false);
+  if (folder) folder.setTrashed(true);
+  return { discarded: Boolean(folder) };
+}
+
+function getTransferFolder_(sessionId, createIfMissing) {
+  const root = getOrCreateFolder_(CONFIG.driveRootFolderName);
+  const uploadRoot = getOrCreateSubFolder_(root, CONFIG.uploadRootFolderName);
+  const folders = uploadRoot.getFoldersByName(sessionId);
+  if (folders.hasNext()) return folders.next();
+  return createIfMissing ? uploadRoot.createFolder(sessionId) : null;
+}
+
+function readTransferManifest_(folder, sessionId) {
+  const files = folder.getFilesByName(CONFIG.uploadManifestFileName);
+  if (files.hasNext()) return JSON.parse(files.next().getBlob().getDataAsString("UTF-8"));
+  return {
+    sessionId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    expectedPhotoCount: 0,
+    receivedBatchIds: [],
+    photos: [],
+    finalized: false,
+    error: ""
+  };
+}
+
+function writeTransferManifest_(folder, manifest) {
+  const content = JSON.stringify(manifest);
+  const files = folder.getFilesByName(CONFIG.uploadManifestFileName);
+  if (files.hasNext()) files.next().setContent(content);
+  else folder.createFile(CONFIG.uploadManifestFileName, content, MimeType.PLAIN_TEXT);
+}
+
+function transferStatusFromManifest_(manifest, found) {
+  return {
+    ok: !manifest.error,
+    found: Boolean(found),
+    photoCount: (manifest.photos || []).length,
+    expectedPhotoCount: Number(manifest.expectedPhotoCount || 0),
+    receivedBatchIds: (manifest.receivedBatchIds || []).slice(),
+    finalized: Boolean(manifest.finalized),
+    interventionId: manifest.interventionId || "",
+    workflowAction: manifest.workflowAction || "",
+    folderUrl: manifest.folderUrl || "",
+    reportUrl: manifest.reportUrl || "",
+    error: manifest.error || ""
+  };
+}
+
+function photoBlobFromDataUrl_(dataUrl) {
+  const text = String(dataUrl || "");
+  const base64 = text.split(",").pop();
+  if (!base64) throw new Error("Photo vide.");
+  return Utilities.newBlob(Utilities.base64Decode(base64), "image/jpeg", "photo.jpg");
+}
+
+function transferPhotoFileName_(photo, uploadKey, index) {
+  if (photo.isSitePhoto) return "photo-du-lieu.jpg";
+  const level = cleanName_(photo.levelName || "niveau") || "niveau";
+  const entryNumber = Number(photo.entryIndex || 0) + 1;
+  const photoNumber = Number(photo.photoIndex || index || 0) + 1;
+  const suffix = cleanName_(uploadKey).slice(-12) || String(index + 1);
+  return level + "-" + entryNumber + "-" + photoNumber + "-" + suffix + ".jpg";
+}
+
+function normalizeUploadIdentifier_(value, label) {
+  const normalized = String(value || "").replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 120);
+  if (!normalized) throw new Error("Identifiant de " + label + " absent.");
+  return normalized;
+}
+
+function cleanupOldTransfers_(currentSessionId) {
+  const root = getOrCreateFolder_(CONFIG.driveRootFolderName);
+  const uploadRoot = getOrCreateSubFolder_(root, CONFIG.uploadRootFolderName);
+  const folders = uploadRoot.getFolders();
+  const now = Date.now();
+  let inspected = 0;
+  while (folders.hasNext() && inspected < 30) {
+    inspected += 1;
+    const folder = folders.next();
+    if (folder.getName() === currentSessionId) continue;
+    try {
+      const manifest = readTransferManifest_(folder, folder.getName());
+      const age = now - new Date(manifest.updatedAt || manifest.createdAt || 0).getTime();
+      const limit = manifest.finalized ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+      if (age > limit) folder.setTrashed(true);
+    } catch (ignored) {
+      console.error(String(ignored));
+    }
+  }
 }
 
 function createReport_(payload, interventionId, interventionFolder, photoRecords) {
@@ -903,7 +1146,6 @@ function exportGoogleDocAsDocx_(docId, fileName) {
 
 function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoRecords) {
   const subject = `[RAPPORT WORD] LISEC - ${interventionId}`;
-  const photoLinks = photoRecords.map((photo) => `- ${photo.levelName} / ${photo.localisation} : ${photo.url}`).join("\n");
   const body = [
     "Bonjour,",
     "",
@@ -920,24 +1162,12 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
     `Personnes presentes : ${presentPeopleText_(payload)}`,
     `Mission : ${payload.mission || ""}`,
     `Diffusion : ${diffusionText_(payload)}`,
-    "",
-    "Liens Drive des photos :",
-    photoLinks || "Aucune photo.",
+    `Nombre de photos enregistrées dans Drive et intégrées au Word : ${photoRecords.length}`,
     "",
     `Le fichier Word ${interventionId}.docx est joint a ce mail.`
   ].join("\n");
 
   const attachments = [docxBlob];
-  if (CONFIG.attachPhotosToEmail) {
-    let currentSize = docxBlob.getBytes().length;
-    photoRecords.forEach((photo) => {
-      const size = photo.blob.getBytes().length;
-      if (currentSize + size <= CONFIG.maxEmailAttachmentBytes) {
-        attachments.push(photo.blob.setName(photo.fileName));
-        currentSize += size;
-      }
-    });
-  }
 
   MailApp.sendEmail({
     to: CONFIG.emailTo,
@@ -949,7 +1179,6 @@ function sendSummaryEmail_(payload, interventionId, reportFile, docxBlob, photoR
 
 function sendCompletionEmail_(payload, interventionId, interventionFolder, spreadsheet, photoRecords) {
   const subject = `[A COMPLETER] LISEC - ${interventionId}`;
-  const photoLinks = photoRecords.map((photo) => `- ${photo.levelName} / ${photo.localisation} : ${photo.url}`).join("\n");
   const body = [
     "Bonjour,",
     "",
@@ -968,30 +1197,14 @@ function sendCompletionEmail_(payload, interventionId, interventionFolder, sprea
     "",
     `Dossier Drive : ${interventionFolder.getUrl()}`,
     `Tableau de suivi : ${spreadsheet.getUrl()}`,
-    "",
-    "Liens Drive des photos :",
-    photoLinks || "Aucune photo."
+    `Nombre de photos enregistrées dans Drive : ${photoRecords.length}`
   ].join("\n");
 
-  const attachments = [];
-  if (CONFIG.attachPhotosToEmail) {
-    let currentSize = 0;
-    photoRecords.forEach((photo) => {
-      const size = photo.blob.getBytes().length;
-      if (currentSize + size <= CONFIG.maxEmailAttachmentBytes) {
-        attachments.push(photo.blob.setName(photo.fileName));
-        currentSize += size;
-      }
-    });
-  }
-
-  const message = {
+  MailApp.sendEmail({
     to: CONFIG.emailTo,
     subject,
     body
-  };
-  if (attachments.length) message.attachments = attachments;
-  MailApp.sendEmail(message);
+  });
 }
 
 function getOrCreateFolder_(name) {
@@ -1069,4 +1282,15 @@ function jsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function javascriptResponse_(callback, data) {
+  const name = String(callback || "");
+  if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) {
+    return jsonResponse(data);
+  }
+  const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
+  return ContentService
+    .createTextOutput(name + "(" + serialized + ");")
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }

@@ -20,16 +20,18 @@ Ce dossier contient une premiere version complete de l'application mobile et du 
 - Gravite : Faible, Moyen, Important, Critique.
 - Photos depuis l'appareil photo ou la galerie.
 - Compression des photos avant envoi.
+- Envoi progressif des photos par lots dimensionnes selon leur poids, sans plafond numerique dans l'application.
+- Verification automatique de chaque lot dans Drive et reprise des lots manquants.
 - Deux parcours : envoi au secretariat pour complement ou generation directe du rapport.
-- Recapitulatif adapte au parcours choisi.
+- Envoi direct pour complement ; recapitulatif conserve uniquement avant une generation directe.
 - Avertissement avant generation directe lorsque des rubriques principales sont vides.
-- Sauvegarde automatique du brouillon sur l'appareil.
+- Remise a zero complete apres confirmation de la finalisation par le serveur.
 - Envoi vers Google Apps Script.
 - Enregistrement dans Google Sheets.
 - Stockage des photos dans Google Drive.
 - Envoi d'un mail court a `secretariat2.lisec@gmail.com`.
 - Rapport Word joint au mail uniquement pour le parcours de generation directe.
-- Liens Drive des photos conserves dans Google Sheets et dans le mail.
+- Liens Drive des photos conserves dans Google Sheets ; les photos ne sont pas jointes au mail.
 
 ## 2. Fichiers
 
@@ -132,6 +134,8 @@ Documentation officielle :
 
 ## 7. Point important pour beaucoup de photos
 
-Les photos sont compressees avant l'envoi. Elles sont toujours stockees dans Google Drive.
+Les photos sont compressees puis envoyees vers une zone temporaire de Google Drive par petits lots. Le serveur enregistre chaque lot une seule fois, controle le nombre recu et ne finalise le dossier que lorsque toutes les photos sont presentes.
 
-Le mail essaie de joindre les photos, mais garde une limite de taille pour eviter un echec d'envoi. Si le mail devient trop lourd, les liens Drive restent disponibles dans le mail et dans le Google Sheet.
+L'application n'impose pas de nombre maximal de photos. La duree du transfert depend de la connexion et du nombre d'images. En cas de lot manquant, trois tentatives automatiques sont effectuees et le formulaire reste affiche si la finalisation ne peut pas etre confirmee.
+
+Les photos sont ensuite deplacees dans le dossier Drive definitif et integrees au Word. Elles ne sont pas jointes au mail afin d'eviter les limites de taille de Gmail.

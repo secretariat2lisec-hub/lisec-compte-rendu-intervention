@@ -434,6 +434,14 @@
       color: #26734d;
     }
 
+    .photo-counter {
+      margin: -4px 0 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: right;
+    }
+
     .review {
       display: none;
       position: fixed;
@@ -551,6 +559,7 @@
     </header>
 
     <div class="status" id="status"></div>
+    <div class="photo-counter" id="photoCounter">0 photo</div>
 
     <form id="reportForm" autocomplete="off">
       <section>
@@ -745,11 +754,17 @@
     </div>
   </div>
 
-  <script src="data.js?v=2026-07-30-9"></script>
+  <script src="data.js?v=2026-07-30-10"></script>
   <script>
-    const APP_VERSION = "2026-07-30-9";
-    const MAX_PHOTO_WIDTH = 1600;
-    const JPEG_QUALITY = 0.72;
+    const APP_VERSION = "2026-07-30-10";
+    const MAX_PHOTO_WIDTH = 1400;
+    const PHOTO_PREVIEW_WIDTH = 360;
+    const JPEG_QUALITY = 0.70;
+    const PREVIEW_JPEG_QUALITY = 0.62;
+    const MAX_UPLOAD_BATCH_CHARS = 2800000;
+    const MAX_UPLOAD_BATCH_PHOTOS = 6;
+    const TRANSFER_STATUS_TIMEOUT = 15000;
+    const FINALIZATION_TIMEOUT = 180000;
     const STORAGE_KEY = "lisec_intervention_draft_v2";
     const LEGACY_STORAGE_KEY = "lisec_intervention_draft_v1";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyKTUQ-SGyClnkjDfo2AuYZqTmpic8qjfiNn3aSdYUBbRPJLnj6mH3h-SjLKIvwjlki/exec";
@@ -758,7 +773,9 @@
       levels: [],
       photoId: 1,
       sitePhoto: null,
-      pendingAction: null
+      pendingAction: null,
+      uploadSessionId: "",
+      interventionId: ""
     };
 
     let autoSaveTimer = null;
@@ -772,6 +789,7 @@
       window.LISEC_DATA.niveaux.forEach((name) => addLevel(name, false, true));
       $("#visitDate").valueAsDate = new Date();
       $("#visitTime").value = currentTimeValue();
+      updatePhotoCounter();
 
       bindEvents();
       registerServiceWorker();
@@ -839,14 +857,20 @@
     function removeEntry(levelId, entryId) {
       const level = state.levels.find((item) => item.id === levelId);
       if (!level) return;
+      const entry = level.entries.find((item) => item.id === entryId);
+      if (entry && entry.photos.length) invalidatePhotoTransfer();
       level.entries = level.entries.filter((entry) => entry.id !== entryId);
       renderLevels();
+      updatePhotoCounter();
       scheduleAutoSave();
     }
 
     function removeLevel(levelId) {
+      const level = state.levels.find((item) => item.id === levelId);
+      if (level && level.entries.some((entry) => entry.photos.length)) invalidatePhotoTransfer();
       state.levels = state.levels.filter((level) => level.id !== levelId);
       renderLevels();
+      updatePhotoCounter();
       scheduleAutoSave();
     }
 
@@ -936,8 +960,11 @@
     }
 
     async function addPhotos(entry, files) {
-        setStatus("Préparation des photos...");
-      for (const file of Array.from(files || [])) {
+      const selectedFiles = Array.from(files || []);
+      if (!selectedFiles.length) return;
+      invalidatePhotoTransfer();
+      setStatus("Préparation des photos...");
+      for (const file of selectedFiles) {
         try {
           const compressed = await compressImage(file);
           entry.photos.push({
@@ -945,13 +972,15 @@
             name: file.name || `photo-${state.photoId}.jpg`,
             type: "image/jpeg",
             size: compressed.size,
-            dataUrl: compressed.dataUrl
+            dataUrl: compressed.previewDataUrl,
+            uploadDataUrl: compressed.dataUrl
           });
         } catch (error) {
           setStatus(`Photo ignorée : ${file.name}`, true);
         }
       }
       renderLevels();
+      updatePhotoCounter();
       setStatus("Photos ajoutées.", false, true);
       scheduleAutoSave();
     }
@@ -960,6 +989,7 @@
       const file = Array.from(event.target.files || [])[0];
       event.target.value = "";
       if (!file) return;
+      invalidatePhotoTransfer();
       setStatus("Préparation de la photo du lieu...");
       try {
         const compressed = await compressImage(file);
@@ -968,9 +998,11 @@
           name: file.name || "photo-du-lieu.jpg",
           type: "image/jpeg",
           size: compressed.size,
-          dataUrl: compressed.dataUrl
+          dataUrl: compressed.previewDataUrl,
+          uploadDataUrl: compressed.dataUrl
         };
         renderSitePhoto();
+        updatePhotoCounter();
         setStatus("Photo du lieu ajoutée.", false, true);
         scheduleAutoSave();
       } catch (error) {
@@ -992,8 +1024,10 @@
       removeButton.className = "danger";
       removeButton.textContent = "Supprimer la photo";
       removeButton.addEventListener("click", () => {
+        invalidatePhotoTransfer();
         state.sitePhoto = null;
         renderSitePhoto();
+        updatePhotoCounter();
         scheduleAutoSave();
       });
       preview.append(image, removeButton);
@@ -1014,7 +1048,13 @@
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-            resolve({ dataUrl, size: Math.round((dataUrl.length * 3) / 4) });
+            const previewScale = Math.min(1, PHOTO_PREVIEW_WIDTH / canvas.width);
+            const preview = document.createElement("canvas");
+            preview.width = Math.max(1, Math.round(canvas.width * previewScale));
+            preview.height = Math.max(1, Math.round(canvas.height * previewScale));
+            preview.getContext("2d").drawImage(canvas, 0, 0, preview.width, preview.height);
+            const previewDataUrl = preview.toDataURL("image/jpeg", PREVIEW_JPEG_QUALITY);
+            resolve({ dataUrl, previewDataUrl, size: Math.round((dataUrl.length * 3) / 4) });
           };
           img.src = reader.result;
         };
@@ -1029,11 +1069,31 @@
         chip.className = "photo-chip";
         chip.innerHTML = `<img src="${photo.dataUrl}" alt=""><span>${escapeHtml(photo.name)}</span>`;
         chip.addEventListener("click", () => {
+          invalidatePhotoTransfer();
           entry.photos = entry.photos.filter((item) => item.id !== photo.id);
           renderLevels();
+          updatePhotoCounter();
         });
         root.appendChild(chip);
       });
+    }
+
+    function invalidatePhotoTransfer() {
+      state.uploadSessionId = "";
+      state.interventionId = "";
+    }
+
+    function totalPhotoCount() {
+      const observationPhotos = state.levels.reduce(
+        (total, level) => total + level.entries.reduce((sum, entry) => sum + entry.photos.length, 0),
+        0
+      );
+      return observationPhotos + (state.sitePhoto ? 1 : 0);
+    }
+
+    function updatePhotoCounter() {
+      const count = totalPhotoCount();
+      $("#photoCounter").textContent = `${count} photo${count > 1 ? "s" : ""}`;
     }
 
     function collectPayload(workflowAction = "") {
@@ -1053,7 +1113,7 @@
         siteAddress: $("#siteAddress").value.trim(),
         postalCode: $("#postalCode").value.trim(),
         city: $("#city").value.trim(),
-        sitePhoto: state.sitePhoto,
+        sitePhoto: state.sitePhoto ? { ...state.sitePhoto } : null,
         clientBlock: $("#clientBlock").value.trim(),
         lisecReference: $("#lisecReference").value.trim(),
         reportTitle: $("#reportTitle").value.trim(),
@@ -1076,7 +1136,7 @@
             localisation: entry.localisation,
             comment: entry.comment,
             gravity: entry.gravity,
-            photos: entry.photos
+            photos: entry.photos.map((photo) => ({ ...photo }))
           }))
         }))
       };
@@ -1210,6 +1270,194 @@
       $("#confirmActionBtn").disabled = isBusy;
     }
 
+    function newTransferIdentifier(prefix) {
+      const random = crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      return `${prefix}-${random}`.replace(/[^a-zA-Z0-9_-]/g, "");
+    }
+
+    function clientSafeName(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "ingenieur";
+    }
+
+    function ensureTransferIdentity(payload) {
+      if (!state.uploadSessionId) state.uploadSessionId = newTransferIdentifier("lisec-upload");
+      if (!state.interventionId) {
+        const now = new Date();
+        const datePart = payload.visitDate || now.toISOString().slice(0, 10);
+        const timePart = [now.getHours(), now.getMinutes(), now.getSeconds()]
+          .map((value) => String(value).padStart(2, "0"))
+          .join("");
+        state.interventionId = `${datePart}-${timePart}-${clientSafeName(payload.engineer)}`;
+      }
+      payload.photoUploadSessionId = state.uploadSessionId;
+      payload.interventionId = state.interventionId;
+    }
+
+    function photoUploadDescriptors(payload) {
+      const photos = [];
+      if (payload.sitePhoto) {
+        photos.push({
+          uploadKey: `site-${payload.sitePhoto.id}`,
+          isSitePhoto: true,
+          name: payload.sitePhoto.name || "photo-du-lieu.jpg",
+          levelName: "Photo du lieu",
+          localisation: [payload.siteAddress, payload.postalCode, payload.city].filter(Boolean).join(" "),
+          entryId: "__SITE_PHOTO__",
+          entryIndex: 0,
+          photoIndex: 0,
+          dataUrl: payload.sitePhoto.uploadDataUrl || payload.sitePhoto.dataUrl
+        });
+      }
+
+      payload.levels.forEach((level) => {
+        level.entries.forEach((entry, entryIndex) => {
+          entry.photos.forEach((photo, photoIndex) => {
+            photos.push({
+              uploadKey: `photo-${level.id}-${entry.id}-${photo.id}`,
+              isSitePhoto: false,
+              name: photo.name || `photo-${photoIndex + 1}.jpg`,
+              levelName: level.name || "",
+              localisation: entry.localisation || "",
+              entryId: entry.id || "",
+              entryIndex,
+              photoIndex,
+              dataUrl: photo.uploadDataUrl || photo.dataUrl
+            });
+          });
+        });
+      });
+      return photos;
+    }
+
+    function buildPhotoBatches(photos) {
+      const batches = [];
+      let current = [];
+      let currentChars = 0;
+      photos.forEach((photo) => {
+        if (!photo.dataUrl) throw new Error(`La photo ${photo.name || "sans nom"} ne peut pas être transférée.`);
+        const photoChars = photo.dataUrl.length;
+        if (current.length && (current.length >= MAX_UPLOAD_BATCH_PHOTOS || currentChars + photoChars > MAX_UPLOAD_BATCH_CHARS)) {
+          batches.push(current);
+          current = [];
+          currentChars = 0;
+        }
+        current.push(photo);
+        currentChars += photoChars;
+      });
+      if (current.length || !batches.length) batches.push(current);
+      return batches;
+    }
+
+    async function postToGoogle(payload) {
+      const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      if (response.type !== "opaque") {
+        const result = await response.json();
+        if (!result.ok) throw new Error(result.error || "Erreur inconnue");
+      }
+    }
+
+    function readTransferStatus(sessionId) {
+      return new Promise((resolve, reject) => {
+        const callbackName = `lisecTransferStatus_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => finish(new Error("Le contrôle du transfert Drive n'a pas répondu.")), TRANSFER_STATUS_TIMEOUT);
+
+        function finish(error, value) {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+          if (error) reject(error);
+          else resolve(value);
+        }
+
+        window[callbackName] = (value) => finish(null, value || {});
+        script.onerror = () => finish(new Error("Impossible de contrôler les photos enregistrées dans Drive."));
+        const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}${separator}api=transfer-status&photoUploadSessionId=${encodeURIComponent(sessionId)}&callback=${callbackName}&v=${Date.now()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function uploadPhotosToDrive(payload, photos) {
+      const batches = buildPhotoBatches(photos);
+      const batchIds = batches.map((_, index) => `${state.uploadSessionId}-batch-${index + 1}`);
+      let status = await readTransferStatus(state.uploadSessionId);
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const received = new Set(status.receivedBatchIds || []);
+        for (let index = 0; index < batches.length; index += 1) {
+          if (received.has(batchIds[index])) continue;
+          const alreadyReceived = Number(status.photoCount || 0);
+          setStatus(`Transfert des photos vers Drive : lot ${index + 1}/${batches.length} (${alreadyReceived}/${photos.length})...`);
+          await postToGoogle({
+            requestType: "photo-batch",
+            photoUploadSessionId: state.uploadSessionId,
+            batchId: batchIds[index],
+            batchIndex: index,
+            isFirstBatch: index === 0,
+            expectedPhotoCount: photos.length,
+            photos: batches[index]
+          });
+        }
+
+        status = await readTransferStatus(state.uploadSessionId);
+        const allBatchesReceived = batchIds.every((batchId) => (status.receivedBatchIds || []).includes(batchId));
+        if (allBatchesReceived && Number(status.photoCount || 0) === photos.length) return status;
+      }
+
+      throw new Error(`Transfert incomplet : ${Number(status.photoCount || 0)}/${photos.length} photo(s) enregistrée(s).`);
+    }
+
+    function payloadWithoutPhotoData(payload, photoCount) {
+      const finalPayload = { ...payload, photoCount };
+      if (finalPayload.sitePhoto) {
+        finalPayload.sitePhoto = {
+          id: finalPayload.sitePhoto.id,
+          name: finalPayload.sitePhoto.name,
+          type: finalPayload.sitePhoto.type,
+          size: finalPayload.sitePhoto.size
+        };
+      }
+      finalPayload.levels = finalPayload.levels.map((level) => ({
+        ...level,
+        entries: level.entries.map((entry) => ({
+          ...entry,
+          photos: entry.photos.map((photo) => ({
+            id: photo.id,
+            name: photo.name,
+            type: photo.type,
+            size: photo.size
+          }))
+        }))
+      }));
+      return finalPayload;
+    }
+
+    async function waitForFinalization(sessionId) {
+      const deadline = Date.now() + FINALIZATION_TIMEOUT;
+      while (Date.now() < deadline) {
+        const status = await readTransferStatus(sessionId);
+        if (status.finalized) return status;
+        if (status.error) {
+          const message = String(status.error).split("\n")[0];
+          throw new Error(message || "La finalisation du dossier a échoué.");
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      }
+      throw new Error("La finalisation prend trop de temps. Le formulaire est conservé pour pouvoir réessayer.");
+    }
+
     async function submitWorkflow(requestedAction = "") {
       const action = requestedAction || state.pendingAction || "completion";
       const scriptUrl = GOOGLE_APPS_SCRIPT_URL.trim();
@@ -1219,21 +1467,22 @@
       }
 
       const payload = collectPayload(action);
+      ensureTransferIdentity(payload);
       setSubmissionBusy(true);
-      setStatus(action === "completion" ? "Envoi au secrétariat en cours..." : "Génération du rapport en cours...");
 
       try {
-        const response = await fetch(scriptUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-
-        if (response.type !== "opaque") {
-          const result = await response.json();
-          if (!result.ok) throw new Error(result.error || "Erreur inconnue");
+        const photos = photoUploadDescriptors(payload);
+        await uploadPhotosToDrive(payload, photos);
+        const finalPayload = payloadWithoutPhotoData(payload, photos.length);
+        setStatus(action === "completion" ? "Photos sécurisées. Envoi au secrétariat..." : "Photos sécurisées. Génération du rapport Word...");
+        let postError = null;
+        try {
+          await postToGoogle(finalPayload);
+        } catch (error) {
+          postError = error;
         }
+        const finalStatus = await waitForFinalization(state.uploadSessionId);
+        if (!finalStatus.finalized && postError) throw postError;
 
         const successMessage = action === "completion"
           ? "Dossier transmis au secrétariat. Un nouveau compte rendu peut être saisi."
@@ -1256,9 +1505,12 @@
       state.sitePhoto = null;
       state.pendingAction = null;
       state.photoId = 1;
+      state.uploadSessionId = "";
+      state.interventionId = "";
       window.LISEC_DATA.niveaux.forEach((name) => addLevel(name, false, true));
       clearTimeout(autoSaveTimer);
       renderSitePhoto();
+      updatePhotoCounter();
       $("#visitDate").valueAsDate = new Date();
       $("#visitTime").value = currentTimeValue();
       localStorage.removeItem(STORAGE_KEY);

@@ -1,4 +1,4 @@
-const CACHE_NAME = "lisec-intervention-v13";
+const CACHE_NAME = "lisec-intervention-v14";
 const APP_FILES = [
   "./",
   "./index.html",
